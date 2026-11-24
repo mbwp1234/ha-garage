@@ -1,0 +1,102 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a vehicle",
+        "description": "The service log and settings are kept as plain JSON in a folder on the share.",
+        "data": {
+          "name": "Vehicle name",
+          "schedule": "Maintenance schedule",
+          "odometer_entity": "Odometer sensor",
+          "fuel_entity": "Fuel level sensor (optional)",
+          "tank_size": "Tank size (litres, optional)",
+          "mount_path": "Share mount path",
+          "folder": "Folder on the share"
+        }
+      }
+    },
+    "error": {
+      "bad_mount": "Use a path under /media or /share.",
+      "not_mounted": "Nothing is mounted at that path. Add it under Settings → System → Storage first.",
+      "bad_folder": "Letters, numbers, spaces, - and _ only."
+    },
+    "abort": {
+      "already_configured": "That folder already belongs to a vehicle."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Vehicle settings",
+        "data": {
+          "name": "Vehicle name",
+          "schedule": "Maintenance schedule",
+          "odometer_entity": "Odometer sensor",
+          "fuel_entity": "Fuel level sensor (optional)",
+          "tank_size": "Tank size (litres, optional)",
+          "mount_path": "Share mount path",
+          "folder": "Folder on the share"
+        }
+      }
+    },
+    "error": {
+      "bad_mount": "Use a path under /media or /share.",
+      "not_mounted": "Nothing is mounted at that path.",
+      "bad_folder": "Letters, numbers, spaces, - and _ only."
+    }
+  },
+  "services": {
+    "log_service": {
+      "name": "Log service",
+      "description": "Record maintenance done on a vehicle.",
+      "fields": {
+        "vehicle": {
+          "name": "Vehicle",
+          "description": "Vehicle name or entry id; optional with one vehicle."
+        },
+        "items": {
+          "name": "Items",
+          "description": "Item numbers, ids or short names, e.g. [\"oil\", 2]."
+        },
+        "odometer": {
+          "name": "Odometer",
+          "description": "Miles; defaults to the last known reading."
+        },
+        "date": {
+          "name": "Date",
+          "description": "Defaults to today."
+        },
+        "notes": {
+          "name": "Notes",
+          "description": "Free text."
+        },
+        "cost": {
+          "name": "Cost",
+          "description": "Optional."
+        },
+        "by": {
+          "name": "Done by",
+          "description": "self, dealer or shop."
+        }
+      }
+    },
+    "set_profile": {
+      "name": "Set profile",
+      "description": "Use the normal or severe interval for an item.",
+      "fields": {
+        "vehicle": {
+          "name": "Vehicle",
+          "description": "Optional with one vehicle."
+        },
+        "item": {
+          "name": "Item",
+          "description": "Item number, id or short name."
+        },
+        "profile": {
+          "name": "Profile",
+          "description": "normal or severe."
+        }
+      }
+    }
+  }
+}

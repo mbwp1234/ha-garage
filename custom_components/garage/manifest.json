@@ -1,0 +1,15 @@
+{
+  "domain": "garage",
+  "name": "Garage",
+  "after_dependencies": ["recorder"],
+  "codeowners": ["@mbwp1234"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "websocket_api"],
+  "documentation": "https://github.com/mbwp1234/ha-garage",
+  "homeassistant": "2025.1.0",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/mbwp1234/ha-garage/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

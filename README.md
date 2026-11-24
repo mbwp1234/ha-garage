@@ -1,0 +1,29 @@
+# Garage
+
+Vehicle maintenance for Home Assistant, with the manufacturer-style schedule built in.
+
+- **A built-in schedule.** Every item carries its normal and severe interval, part numbers, fluid spec, torque values and notes, so the printed guide stays in the drawer. The bundled schedule is the 3rd-gen Toyota Tacoma *Maintenance Map* (credit: Soft Taco, Tacoma World). Its 0–300k chart is reproduced by the test suite column by column.
+- **The odometer drives it.** Point it at any odometer sensor (an OBD dongle works well). Garage keeps the last known reading while the vehicle sleeps, and a missing reading is never treated as zero.
+- **Your log lives in your own folder,** as plain JSON on a share mounted in Home Assistant. Nothing is ever deleted: removed entries are only marked, and a snapshot is taken each day before the first write.
+- **Entities for automations:**
+  - `sensor.<vehicle>_<item>_due_in`: miles left; negative means overdue, unknown means never logged.
+  - `sensor.<vehicle>_services_overdue` and `sensor.<vehicle>_next_service`.
+  - `binary_sensor.<vehicle>_service_due`.
+  - `sensor.<vehicle>_odometer_last_known` (long-term statistics).
+- **Services:** `garage.log_service` and `garage.set_profile`.
+
+## Install
+
+1. Mount a share in Home Assistant (Settings → System → Storage → Add network storage, usage *Media*), e.g. `/media/garage`.
+2. Add this repository to HACS as a custom integration repository, install **Garage**, and restart.
+3. Settings → Devices & services → Add integration → **Garage**. Pick the schedule, the odometer sensor and a folder name.
+
+To show a picture of the vehicle in the panel, put `truck.png` (or `vehicle.jpg`) in the vehicle's folder.
+
+## Development
+
+```
+python -m pytest tests
+```
+
+The tests need no Home Assistant install.

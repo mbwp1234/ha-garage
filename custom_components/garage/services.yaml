@@ -1,0 +1,49 @@
+log_service:
+  fields:
+    vehicle:
+      example: "My truck"
+      selector:
+        text:
+    items:
+      required: true
+      example: '["oil", "rotation"]'
+      selector:
+        object:
+    odometer:
+      selector:
+        number:
+          min: 0
+          max: 2000000
+          mode: box
+          unit_of_measurement: mi
+    date:
+      selector:
+        date:
+    notes:
+      selector:
+        text:
+    cost:
+      selector:
+        number:
+          min: 0
+          max: 100000
+          mode: box
+    by:
+      selector:
+        select:
+          options: ["self", "dealer", "shop"]
+set_profile:
+  fields:
+    vehicle:
+      selector:
+        text:
+    item:
+      required: true
+      example: "oil"
+      selector:
+        text:
+    profile:
+      required: true
+      selector:
+        select:
+          options: ["normal", "severe"]
