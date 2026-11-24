@@ -10,7 +10,8 @@ Vehicle maintenance for Home Assistant, with the manufacturer-style schedule bui
   - `sensor.<vehicle>_services_overdue` and `sensor.<vehicle>_next_service`.
   - `binary_sensor.<vehicle>_service_due`.
   - `sensor.<vehicle>_odometer_last_known` (long-term statistics).
-- **Services:** `garage.log_service` and `garage.set_profile`.
+- **Services:** `garage.log_service`, `garage.set_profile` and `garage.export_record`.
+- **A service record for a sale.** *Service record* on the Log card opens a printable page (print it or save it as a PDF): where every scheduled item stands and every logged service, newest first. A CSV of the same history is saved beside it in `<folder>/exports/`. Entries corrected after the fact are marked; who logged what, and deleted entries, are left out. Costs are only included when asked for (`costs: true`). Add an optional `vehicle` block to `settings.json` (`year`, `make`, `model`, `trim`, `vin`) to title the record.
 
 ## Install
 

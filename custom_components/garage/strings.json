@@ -99,6 +99,20 @@
           "description": "normal or severe."
         }
       }
+    },
+    "export_record": {
+      "name": "Export service record",
+      "description": "Write a printable service record (HTML) and a CSV of the log to the vehicle's exports folder, e.g. for a sale.",
+      "fields": {
+        "vehicle": {
+          "name": "Vehicle",
+          "description": "Optional with one vehicle."
+        },
+        "costs": {
+          "name": "Include costs",
+          "description": "Add a cost column when any costs were logged."
+        }
+      }
     }
   }
 }

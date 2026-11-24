@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.5.2';
+var VERSION = '0.6.0';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
@@ -148,6 +148,9 @@ var CSS = [
 '.tag{height:24px;padding:0 9px;border-radius:12px;background:var(--card2);font-size:12px;font-weight:600;color:var(--ink2);display:inline-flex;align-items:center}',
 '.entry .its{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}',
 '.edited{font-size:10px;font-weight:700;color:var(--ink3);margin-left:4px}',
+'.hdbtn{margin-left:auto;height:32px;padding:0 12px;border-radius:16px;background:var(--card2);font-weight:600;font-size:13px;color:var(--ink2);display:inline-flex;align-items:center;gap:6px;position:relative}',
+'.hdbtn::after{content:"";position:absolute;inset:-6px -4px}',
+'.hdbtn[disabled]{opacity:.5}',
 '.more{width:100%;height:44px;margin-top:6px;border-radius:22px;background:var(--card2);font-weight:600;color:var(--ink2)}',
 /* sheets */
 '.scrim{position:absolute;inset:0;background:var(--scrim);opacity:0;transition:opacity .2s}',
@@ -802,7 +805,9 @@ class GaragePanel extends HTMLElement {
     var sched = this._data.vehicle.schedule.items;
     var short = function (n) { var it = sched.find(function (x) { return x.n === n; }); return it ? it.short : '#' + n; };
     var BY = { self: 'me', dealer: 'dealer', shop: 'shop' };
-    var html = '<section class="card logcard" style="padding-bottom:12px"><div class="hd"><span class="ico">' + I.log + '</span><span class="t">Log</span></div><div style="margin-top:6px">';
+    var html = '<section class="card logcard" style="padding-bottom:12px"><div class="hd"><span class="ico">' + I.log + '</span><span class="t">Log</span>' +
+      (rows.length ? '<button class="hdbtn" data-act="export"' + (this._exporting ? ' disabled' : '') + ' title="A printable service record and a CSV, e.g. for a sale">Service record</button>' : '') +
+      '</div><div style="margin-top:6px">';
     if (!rows.length) html += '<div class="hatchbox" style="height:48px"></div>';
     shown.forEach(function (e) {
       var meta = [e.odometer == null ? '—' : fmt(e.odometer), BY[e.by] || ''].filter(Boolean).join(' · ');
@@ -1081,6 +1086,7 @@ class GaragePanel extends HTMLElement {
     if (a === 'item') { this._open({ kind: 'item', n: n }); return; }
     if (a === 'poster') { this._open({ kind: 'poster' }); return; }
     if (a === 'close') { this._close(); return; }
+    if (a === 'export') { this._export(); return; }
     if (a === 'all') { this._showAll = !this._showAll; this._render(); return; }
     if (a === 'log') { this._open({ kind: 'log', sel: n ? [n] : [] }); return; }
     if (a === 'catchup') {
@@ -1239,6 +1245,27 @@ class GaragePanel extends HTMLElement {
       await this._load();
       this._renderSheet(true);
     } catch (e) { this._toast((e && e.message) || 'Could not undo.'); }
+  }
+
+  /* The record is saved to the vehicle's exports/ folder, then opened through a signed URL:
+     a blob: link can't leave the companion app's web view, a signed path can. The window is
+     opened before the first await so the tap still counts as the gesture that opened it. */
+  async _export() {
+    if (this._exporting) return;
+    var v = this._data.vehicle;
+    var w = null;
+    try { w = window.open('', '_blank'); } catch (e) { w = null; }
+    this._exporting = true; this._render();
+    try {
+      var r = await this._hass.callWS({ type: 'garage/export', entry_id: v.entry_id });
+      var signed = await this._hass.callWS({ type: 'auth/sign_path', path: '/api/garage/' + v.entry_id + '/record.html', expires: 120 });
+      if (w) w.location.href = signed.path; else window.open(signed.path, '_blank');
+      this._toast(r.saved ? 'Saved to the exports folder too' : 'Opened (not saved: ' + (r.save_error || 'no folder') + ')');
+    } catch (e) {
+      if (w) w.close();
+      this._toast((e && e.message) || 'Could not make the record.');
+    }
+    this._exporting = false; this._render();
   }
 
   async _write(msg, toast, keepSheet) {

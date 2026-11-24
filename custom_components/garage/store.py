@@ -6,6 +6,7 @@ Layout under <mount>/<folder>/:
     settings.json                per-item Normal/Severe choice, month limits
     stats.json                   learned: last tank reading, fill-ups, battery at rest
     backups/log-<date>.json      a snapshot taken before the first write of each day
+    exports/                     service records made for a sale (HTML + CSV)
     receipts/                    photos linked from entries (later)
 
 Nothing is ever deleted: removing an entry marks it `deleted` and keeps it in the file.
@@ -231,6 +232,18 @@ class GarageStore:
     def save_stats(self, data: dict[str, Any]) -> None:
         with self._lock:
             self._write(STATS_FILE, data)
+
+    def save_export(self, files: dict[str, str]) -> str:
+        """Write each {filename: text} under exports/. Returns the folder."""
+        self._require()
+        out = self.root / "exports"
+        with self._lock:
+            out.mkdir(parents=True, exist_ok=True)
+            for name, text in files.items():
+                if "/" in name or name.startswith("."):
+                    raise GarageError(f"Bad export name {name!r}.")
+                (out / name).write_text(text, encoding="utf-8")
+        return str(out)
 
     def set_profile(self, n: int, profile: str) -> dict[str, Any]:
         if n not in self.valid_items:

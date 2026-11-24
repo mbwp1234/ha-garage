@@ -47,3 +47,12 @@ set_profile:
       selector:
         select:
           options: ["normal", "severe"]
+export_record:
+  fields:
+    vehicle:
+      selector:
+        text:
+    costs:
+      default: false
+      selector:
+        boolean:
