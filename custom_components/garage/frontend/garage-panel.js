@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.4.4';
+var VERSION = '0.5.0';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
@@ -30,8 +30,9 @@ var CSS = [
 '.scroll{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}',
 '.app{max-width:560px;margin:0 auto;padding:0 16px calc(48px + env(safe-area-inset-bottom,0px))}',
 '.cols{display:flex;flex-direction:column;gap:16px}',
-'.col{display:flex;flex-direction:column;gap:16px;min-width:0}',
-'@media (min-width:1060px){.app{max-width:1160px}.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}}',
+'.col{display:contents}',
+'.hero{order:1}.roadcard{order:2}.list{order:3}#tiles{order:4}.logcard{order:5}',
+'@media (min-width:1060px){.app{max-width:1160px}.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}.col{display:flex;flex-direction:column;gap:16px;min-width:0}#tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}',
 '.top{display:flex;align-items:center;gap:6px;height:58px}',
 '.iconbtn{width:44px;height:44px;border-radius:22px;display:grid;place-items:center;color:var(--ink2)}',
 '.title{padding:2px 4px 18px}',
@@ -61,7 +62,11 @@ var CSS = [
 '.hs b{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#101623;color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center}',
 '@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--over) 55%,transparent)}100%{box-shadow:0 0 0 12px transparent}}',
 '.herobody{padding:18px 20px 20px;display:flex;flex-direction:column;gap:16px}',
-'.bignum{display:flex;align-items:baseline;gap:10px}',
+'.bignum{display:flex;align-items:baseline;gap:10px 22px;flex-wrap:wrap}',
+'.bn{display:flex;align-items:baseline;gap:8px}',
+'.bn.minor .n{font-size:40px;font-weight:250;letter-spacing:-.04em}',
+'.pill{position:absolute;left:0;top:0;visibility:hidden;height:26px;padding:0 10px 0 8px;border-radius:13px;background:rgba(16,22,35,.82);color:#fff;font-size:11.5px;font-weight:650;display:flex;align-items:center;gap:6px;white-space:nowrap}',
+'.pill i{width:7px;height:7px;border-radius:50%;background:#9AA4B2}.pill.over i{background:#FF8A5B}.pill.soon i{background:#FFC048}.pill.ok i{background:#8EA9C6}',
 '.bignum .n{font-size:64px;font-weight:200;letter-spacing:-.05em;line-height:.85}',
 '.bignum .l{font-size:15px;font-weight:600;color:var(--ink2)}',
 '.c-over{color:var(--over)}.c-soon{color:var(--soonink)}.c-ok{color:var(--cav)}.c-nolog{color:var(--ink3)}',
@@ -82,13 +87,23 @@ var CSS = [
 '.sec.armed{background:var(--over);color:#fff}',
 /* road */
 '.road{position:relative;height:150px;margin:12px 6px 0}',
-'.stk{position:absolute;bottom:62px;width:24px;margin-left:-12px;display:flex;flex-direction:column-reverse;gap:4px}',
+'.stk{position:absolute;bottom:62px;width:24px;margin-left:-12px;display:flex;flex-direction:column-reverse;align-items:center;gap:8px}',
+'.stk.on::before{content:"";position:absolute;inset:-4px;border-radius:16px;background:color-mix(in srgb,var(--cav) 14%,transparent)}',
+'.stk button{position:relative}',
+'.stk button::after{content:"";position:absolute;inset:-4px -8px}',
+'.plusn{width:24px;height:18px;border-radius:9px;background:var(--track);font-size:10.5px;font-weight:700;color:var(--ink2)}',
+'.stop{padding:12px 14px;border-radius:18px;background:var(--card2);display:flex;flex-direction:column;gap:10px}',
+'.stop .sh{display:flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap}.stop .sh b{font-size:13px;font-weight:650}.stop .sh span{font-size:12px;font-weight:600;color:var(--ink3)}',
+'.schips{display:flex;flex-wrap:wrap;gap:6px}',
+'.schips .ichip{height:32px;padding:0 10px 0 4px;gap:6px;background:var(--card);font-size:12.5px}.schips .nb{width:22px;height:22px;font-size:11px}',
+'.nlt{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink3);margin-right:4px}',
+'.nologrow .chip{margin-left:auto}',
 '.stk button{display:block}',
 '.lane{position:absolute;left:0;right:0;bottom:50px;height:6px;border-radius:3px;background:repeating-linear-gradient(90deg,var(--track) 0 10px,transparent 10px 16px)}',
 '.lane i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ink)}',
 '.tick{position:absolute;bottom:22px;transform:translateX(-50%);font-size:11px;font-weight:600;color:var(--ink3)}',
 '.now{position:absolute;bottom:41px;width:34px;margin-left:-17px;color:var(--cav)}',
-'.nologrow{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:4px;padding-top:14px;border-top:1px solid var(--track)}',
+'.nologrow{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:14px;padding-top:14px;border-top:1px solid var(--track)}',
 '.q{width:24px;height:24px;display:grid;place-items:center;color:var(--ink3)}',
 /* list */
 '.grp{display:flex;align-items:center;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink3);padding:14px 4px 4px}',
@@ -102,6 +117,13 @@ var CSS = [
 '.val{text-align:right;font-size:16px;font-weight:500;letter-spacing:-.01em}',
 '.val small{display:block;font-size:11px;font-weight:600;color:var(--ink3);letter-spacing:0}',
 '.val.over{color:var(--over)}.val.soon{color:var(--soonink)}.val.nolog{color:var(--ink3)}',
+'.val.nl{font-size:12px;font-weight:600;color:var(--ink3)}',
+'.row.nolog{height:44px}',
+'.goodrow{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;margin:2px 0 4px;padding:10px 14px;border-radius:18px;background:var(--card2);text-align:left}',
+'.goodrow .gt{display:flex;flex-direction:column;gap:3px;min-width:0}.goodrow .gt b{font-size:14px;font-weight:650}.goodrow .gt span{font-size:12px;font-weight:600;color:var(--ink3)}',
+'.stackn{margin-left:auto;display:flex;flex:none}.stackn .nb{width:22px;height:22px;font-size:10.5px;margin-left:-6px}.stackn .nb:first-child{margin-left:0}',
+'.nb.plus{background:var(--track);color:var(--ink2)}',
+'.goodrow svg{flex:none;color:var(--ink3);transition:transform .2s}.goodrow[aria-expanded="true"] svg{transform:rotate(180deg)}',
 /* tiles */
 '.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}',
 '.tile{display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:24px;min-height:150px}',
@@ -120,10 +142,10 @@ var CSS = [
 '.hatchbox{height:30px;border-radius:10px;background:repeating-linear-gradient(45deg,var(--hatch) 0 3px,transparent 3px 8px)}',
 '.mini{font-size:11px;font-weight:600;color:var(--ink3)}',
 /* log */
-'.entry{display:grid;grid-template-columns:96px 70px minmax(0,1fr);align-items:center;gap:10px;min-height:50px;padding:6px 4px;width:100%;text-align:left;border-top:1px solid var(--track)}',
+'.entry{display:grid;grid-template-columns:118px minmax(0,1fr);align-items:center;gap:10px;min-height:56px;padding:10px 4px;width:100%;text-align:left;border-top:1px solid var(--track)}',
 '.entry:first-of-type{border-top:0}',
-'.entry .d{font-size:13px;font-weight:600}',
-'.entry .o{font-size:13px;color:var(--ink2);text-align:right}',
+'.entry .d{display:flex;flex-direction:column;gap:2px}.entry .d b{font-size:13.5px;font-weight:650}.entry .d > span{font-size:11.5px;font-weight:600;color:var(--ink3)}',
+'.tag{height:24px;padding:0 9px;border-radius:12px;background:var(--card2);font-size:12px;font-weight:600;color:var(--ink2);display:inline-flex;align-items:center}',
 '.entry .its{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}',
 '.edited{font-size:10px;font-weight:700;color:var(--ink3);margin-left:4px}',
 '.more{width:100%;height:44px;margin-top:6px;border-radius:22px;background:var(--card2);font-weight:600;color:var(--ink2)}',
@@ -134,6 +156,7 @@ var CSS = [
 '.sheet.on{transform:none}',
 '@media (min-width:700px){.sheet{left:50%;width:560px;margin-left:-280px}}',
 '.sheet .in{overflow-y:auto;padding:10px 20px calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px}',
+'.sheet .in > *{flex:none}',
 '.grab{width:40px;height:5px;border-radius:3px;background:var(--track);margin:0 auto}',
 '.shd{display:flex;align-items:center;gap:10px}',
 '.shd .t{font-size:20px;font-weight:650;letter-spacing:-.02em}',
@@ -167,6 +190,22 @@ var CSS = [
 '.it[aria-pressed="true"] .nb{background:var(--cav);border-color:var(--cav);color:#fff}',
 ':host([dark]) .it[aria-pressed="true"] .nb{color:#0A0E18}',
 '.err{color:var(--over);font-weight:600;font-size:13px;padding:0 4px}',
+'.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink3)}',
+'.cuv{display:flex;flex-direction:column;gap:8px}',
+'.visits{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}',
+'.visits button{flex:none;height:36px;padding:0 12px;border-radius:18px;background:var(--card2);border:2px solid transparent;font-size:12.5px;font-weight:600;color:var(--ink2)}',
+'.visits button[aria-pressed="true"]{border-color:var(--cav);background:color-mix(in srgb,var(--cav) 14%,var(--card2));color:var(--ink)}',
+'.cus{display:flex;flex-direction:column;gap:10px}',
+'.cu{padding:14px;border-radius:20px;background:var(--card2);display:flex;flex-direction:column;gap:12px}',
+'.cuh{display:flex;align-items:center;gap:10px}',
+'.cuh .nb{width:26px;height:26px}',
+'.nb.sel{background:var(--cav);color:#fff}:host([dark]) .nb.sel{color:#0A0E18}',
+'.cut{display:flex;flex-direction:column;min-width:0}.cut b{font-size:14px;font-weight:650}.cut span{font-size:11.5px;font-weight:600;color:var(--ink3)}',
+'.seg.sm{margin-left:auto;flex:none;padding:3px;border-radius:19px;background:var(--card)}',
+'.seg.sm button{height:36px;padding:0 12px;border-radius:16px;font-size:12.5px}',
+'.seg.sm button[aria-pressed="true"]{background:var(--cav);color:#fff;box-shadow:none}:host([dark]) .seg.sm button[aria-pressed="true"]{color:#0A0E18}',
+'.seg.sm button[data-m="unsure"][aria-pressed="true"]{background:var(--ink2);color:var(--card)}',
+'.cu .fld{background:var(--card)}',
 '.acts{display:flex;flex-direction:column;gap:8px}',
 '.act{display:grid;grid-template-columns:minmax(0,1fr) 210px;align-items:center;gap:10px;font-size:13px;font-weight:600;padding-left:4px}',
 '.act .seg button{height:36px}',
@@ -188,6 +227,7 @@ var CSS = [
 ].join('\n');
 
 var I = {
+  down: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
   menu: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
   odo: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 18a9 9 0 1 1 16 0"/><path d="M12 14l4-5"/></svg>',
   plus: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
@@ -232,6 +272,8 @@ function fresh(st, sec) {
   var t = new Date(st.last_reported || st.last_updated).getTime();
   return isFinite(t) && Date.now() - t < (sec || 180) * 1000;
 }
+/* "Jun 12 ’26": a log date on one line at phone width. */
+function dyear(s) { var d = pd(s); return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ’' + String(d.getFullYear()).slice(2) : '—'; }
 function today() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function ago(iso) {
   if (!iso) return '';
@@ -306,6 +348,7 @@ class GaragePanel extends HTMLElement {
     this._tw = this.shadowRoot.getElementById('toastwrap');
     var self = this;
     this.shadowRoot.addEventListener('click', function (e) { self._click(e); });
+    if (window.ResizeObserver) new ResizeObserver(function () { self._layoutPills(); }).observe(this._root);
   }
 
   _soon() {
@@ -423,17 +466,18 @@ class GaragePanel extends HTMLElement {
     var html = head;
     html += '<div class="title"><h1>' + esc(v.name) + '</h1><div class="odo">' + I.odo + (v.odometer == null ? 'No odometer reading yet' : fmt(v.odometer) + ' mi') +
       '<span class="live' + (live ? '' : ' off') + '" title="' + (live ? 'Running' : 'Parked') + '"></span>' +
-      (!live && asOf ? '<span class="mini">' + esc(ago(asOf)) + '</span>' : '') + '</div></div>';
+      (!live && asOf ? '<span class="mini">parked ' + esc(ago(asOf)) + '</span>' : '') + '</div></div>';
     if (this._err) html += '<div class="banner">' + esc(this._err) + '</div>';
     if (v.error) html += '<div class="banner">' + esc(v.error) + '</div>';
     else if (v.storage && v.storage.mounted === false) html += '<div class="banner">The garage folder isn\'t mounted, so nothing can be logged right now.</div>';
-    html += '<div class="cols"><div class="col">' + this._hero(v) + this._road(v) + '</div><div class="col">' +
-      this._list(v) + this._tiles() + this._logCard(d.log || []) + '</div></div>';
+    html += '<div class="cols"><div class="col">' + this._hero(v) + this._road(v) + this._tiles() + '</div><div class="col">' +
+      this._list(v) + this._logCard(d.log || []) + '</div></div>';
     var y = this.shadowRoot.querySelector('.scroll').scrollTop;
     this._root.innerHTML = html;
     this.shadowRoot.querySelector('.scroll').scrollTop = y;
     this._paintTiles();
-    if (this._sheet && this._sheet.kind !== 'log') this._renderSheet(true);
+    this._layoutPills();
+    if (this._sheet && (this._sheet.kind === 'item' || this._sheet.kind === 'poster')) this._renderSheet(true);
   }
 
   _items() { return (this._data.vehicle.items || []).slice(); }
@@ -446,7 +490,7 @@ class GaragePanel extends HTMLElement {
     var zones = v.schedule.zones || {};
     var items = this._items();
     var sel = this._zone;
-    var spots = '';
+    var spots = '', pills = '';
     var self = this;
     Object.keys(zones).forEach(function (z) {
       var pos = hs[z];
@@ -456,32 +500,63 @@ class GaragePanel extends HTMLElement {
       var worst = its.reduce(function (a, b) { return RANK[b.status] < RANK[a] ? b.status : a; }, 'ok');
       var due = its.filter(function (i) { return i.status !== 'ok'; }).length;
       spots += '<button class="hs ' + worst + (sel === z ? ' sel' : '') + '" style="left:' + pos[0] + '%;top:' + pos[1] + '%" data-act="zone" data-z="' + esc(z) +
-        '" aria-pressed="' + (sel === z) + '" aria-label="' + esc(zones[z]) + ', ' + due + ' need attention"><i></i>' + (due > 1 ? '<b>' + due + '</b>' : '') + '</button>';
+        '" aria-pressed="' + (sel === z) + '" aria-label="' + esc(zones[z]) + ', ' + due + ' need attention"><i></i></button>';
+      /* Only what needs doing is named on the photo (plus the one you picked); a name on every dot is a parts diagram. */
+      if (worst === 'over' || worst === 'soon' || sel === z) {
+        pills += '<button class="pill ' + worst + '" data-act="zone" data-z="' + esc(z) + '" data-x="' + pos[0] + '" data-y="' + pos[1] + '" tabindex="-1" aria-hidden="true"><i></i>' +
+          esc(zones[z]) + (due > 1 ? ' · ' + due : '') + '</button>';
+      }
     });
-    var bigN, bigL, bigC, chips;
+    var pair = function (n, l, c, minor) { return '<span class="bn' + (minor ? ' minor' : '') + '"><span class="n ' + c + '">' + esc(n) + '</span><span class="l">' + esc(l) + '</span></span>'; };
+    var byRank = function (a, b) { return RANK[a.status] - RANK[b.status] || (a.remaining == null ? 0 : a.remaining) - (b.remaining == null ? 0 : b.remaining); };
+    var big, chips;
     if (sel && zones[sel]) {
-      var its = items.filter(function (i) { return i.zone === sel; }).sort(function (a, b) { return RANK[a.status] - RANK[b.status]; });
+      var its = items.filter(function (i) { return i.zone === sel; }).sort(byRank);
       var due = its.filter(function (i) { return i.status !== 'ok'; });
-      bigN = due.length; bigL = zones[sel]; bigC = due.length ? 'c-' + (due[0].status === 'nolog' ? 'nolog' : due[0].status) : 'c-ok';
+      big = pair(due.length, zones[sel], due.length ? 'c-' + due[0].status : 'c-ok');
       chips = its;
-    } else if (s.over) {
-      bigN = s.over; bigL = 'overdue'; bigC = 'c-over';
-      chips = items.filter(function (i) { return i.status === 'over'; });
-    } else if (s.soon) {
-      bigN = s.soon; bigL = 'due soon'; bigC = 'c-soon';
-      chips = items.filter(function (i) { return i.status === 'soon'; });
+    } else if (s.over || s.soon) {
+      big = (s.over ? pair(s.over, 'overdue', 'c-over') : '') + (s.soon ? pair(s.soon, 'soon', 'c-soon', !!s.over) : '');
+      chips = items.filter(function (i) { return i.status === 'over' || i.status === 'soon'; }).sort(byRank);
     } else {
-      bigN = s.next ? fmt(s.next.remaining) : '—'; bigL = s.next ? 'mi to ' + s.next.short : 'all good'; bigC = 'c-ok';
+      big = pair(s.next ? fmt(s.next.remaining) : '—', s.next ? 'mi to ' + s.next.short : 'all good', 'c-ok');
       chips = [];
     }
     var chipHtml = chips.map(function (i) {
       return '<button class="ichip" data-act="item" data-n="' + i.n + '"><span class="nb ' + i.status + '">' + i.n + '</span>' + esc(i.short) + '</button>';
     }).join('');
     var pic = this._img ? '<img src="' + this._img + '" alt="' + esc(v.name) + '">' : '<div class="noimg">' + I.truck + '</div>';
-    return '<section class="card hero"><div class="garage">' + pic + spots + '</div><div class="herobody">' +
-      '<div class="bignum"><span class="n ' + bigC + '">' + esc(bigN) + '</span><span class="l">' + esc(bigL) + '</span></div>' +
+    return '<section class="card hero"><div class="garage">' + pic + spots + pills + '</div><div class="herobody">' +
+      '<div class="bignum">' + big + '</div>' +
       (chipHtml ? '<div class="chips">' + chipHtml + '</div>' : '') +
       '<button class="pri" data-act="log">' + I.plus + 'Log service</button></div></section>';
+  }
+
+  /* Labels go where they cover neither a dot nor another label: above, below, then beside. */
+  _layoutPills() {
+    var g = this.shadowRoot.querySelector('.garage');
+    if (!g) return;
+    var W = g.clientWidth, H = g.clientHeight;
+    if (!W || !H) return;
+    var taken = [];
+    g.querySelectorAll('.hs').forEach(function (d) { taken.push([d.offsetLeft + d.offsetWidth / 2 - 13, d.offsetTop + d.offsetHeight / 2 - 13, 26, 26]); });
+    g.querySelectorAll('.pill').forEach(function (p) {
+      var w = p.offsetWidth, h = p.offsetHeight;
+      var x = +p.dataset.x / 100 * W, y = +p.dataset.y / 100 * H;
+      var cands = [[x - w / 2, y - h - 14], [x - w / 2, y + 14], [x + 16, y - h / 2], [x - w - 16, y - h / 2], [x - w / 2, y - 2 * h - 20], [x - w / 2, y + h + 20]];
+      var pick = null, first = null;
+      for (var i = 0; i < cands.length && !pick; i++) {
+        var l = Math.max(6, Math.min(W - w - 6, cands[i][0])), t = Math.max(6, Math.min(H - h - 6, cands[i][1]));
+        if (!first) first = [l, t];
+        var hit = taken.some(function (b) { return l < b[0] + b[2] + 4 && l + w + 4 > b[0] && t < b[1] + b[3] + 4 && t + h + 4 > b[1]; });
+        if (!hit) pick = [l, t];
+      }
+      pick = pick || first;
+      taken.push([pick[0], pick[1], w, h]);
+      p.style.left = pick[0].toFixed(0) + 'px';
+      p.style.top = pick[1].toFixed(0) + 'px';
+      p.style.visibility = 'visible';
+    });
   }
 
   _road(v) {
@@ -490,56 +565,95 @@ class GaragePanel extends HTMLElement {
     var chip = pace ? '<span class="chip">≈ ' + fmt(pace) + ' mi/day</span>' : '';
     var head = '<div class="hd"><span class="ico">' + I.map + '</span><span class="t">Map</span>' + chip +
       '<button class="chip" style="margin-left:' + (chip ? '6px' : 'auto') + '" data-act="poster">Full map</button></div>';
-    if (odo == null) return '<section class="card">' + head + '<div class="hatchbox" style="margin-top:14px;height:80px"></div></section>';
+    if (odo == null) return '<section class="card roadcard">' + head + '<div class="hatchbox" style="margin-top:14px;height:80px"></div></section>';
     var start = Math.floor((odo - 15000) / 10000) * 10000;
     if (start < 0) start = 0;
     var end = start + 55000;
     var pct = function (m) { return Math.max(0, Math.min(100, (m - start) / (end - start) * 100)); };
+    var byRank = function (a, b) { return RANK[a.status] - RANK[b.status] || a.due_at - b.due_at || a.n - b.n; };
     var items = this._items().filter(function (i) { return i.status !== 'nolog' && i.due_at != null; });
+    /* Stops closer than 9% of the strip are one stop: two stacks that touch are two targets nobody can hit. */
     var buckets = [];
     items.sort(function (a, b) { return a.due_at - b.due_at; }).forEach(function (i) {
-      var p = pct(i.due_at);
-      if (i.due_at > end) p = 100;
-      var b = buckets.find(function (x) { return Math.abs(x.p - p) < 6; });
-      if (b) b.items.push(i); else buckets.push({ p: p, items: [i] });
+      var p = i.due_at > end ? 100 : pct(i.due_at);
+      var b = buckets.find(function (x) { return Math.abs(x.p0 - p) < 9; });
+      if (b) b.items.push(i); else buckets.push({ p0: p, p: p, items: [i] });
     });
     var odoP = pct(odo);
     buckets.forEach(function (b) { if (Math.abs(b.p - odoP) < 4) b.p = Math.min(100, odoP + 6); });
-    var stacks = buckets.map(function (b) {
-      return '<div class="stk" style="left:' + b.p.toFixed(1) + '%">' + b.items.slice(0, 5).map(function (i) {
-        return '<button data-act="item" data-n="' + i.n + '" aria-label="' + esc(i.name) + '"><span class="nb ' + i.status + '">' + i.n + '</span></button>';
-      }).join('') + '</div>';
+    /* Nudging a stop clear of the truck can push it into its neighbour: merge again where they now meet. */
+    buckets.sort(function (a, b) { return a.p - b.p; });
+    for (var bi0 = 1; bi0 < buckets.length; bi0++) {
+      if (buckets[bi0].p - buckets[bi0 - 1].p < 9) { buckets[bi0 - 1].items = buckets[bi0 - 1].items.concat(buckets[bi0].items); buckets.splice(bi0, 1); bi0--; }
+    }
+    buckets.forEach(function (b) { b.items.sort(byRank); });
+    var upcoming = buckets.findIndex(function (b) { return b.items.some(function (i) { return i.status !== 'over'; }); });
+    var selB = this._stop != null && this._stop < buckets.length ? this._stop : (upcoming >= 0 ? upcoming : 0);
+    var tall = 1;
+    var stacks = buckets.map(function (b, bi) {
+      var shown = b.items.length > 5 ? b.items.slice(0, 4) : b.items;
+      tall = Math.max(tall, shown.length + (b.items.length > shown.length ? 1 : 0));
+      return '<div class="stk' + (bi === selB ? ' on' : '') + '" style="left:' + b.p.toFixed(1) + '%">' + shown.map(function (i) {
+        return '<button data-act="stop" data-b="' + bi + '" aria-label="' + esc(i.name) + '"><span class="nb ' + i.status + '">' + i.n + '</span></button>';
+      }).join('') + (b.items.length > shown.length ? '<button data-act="stop" data-b="' + bi + '" class="plusn" aria-label="' + (b.items.length - shown.length) + ' more">+' + (b.items.length - shown.length) + '</button>' : '') + '</div>';
     }).join('');
     var ticks = '';
     for (var m = start; m <= end; m += 10000) ticks += '<span class="tick" style="left:' + pct(m).toFixed(1) + '%">' + (m / 1000) + 'k</span>';
+    var stop = '';
+    var sb = buckets[selB];
+    if (sb) {
+      var kk = function (x) { return (x / 1000).toFixed(x % 1000 ? 1 : 0) + 'k'; };
+      var lo = sb.items.reduce(function (a, i) { return Math.min(a, i.due_at); }, Infinity);
+      var hi = sb.items.reduce(function (a, i) { return Math.max(a, i.due_at); }, -Infinity);
+      var allOver = sb.items.every(function (i) { return i.status === 'over'; });
+      var etas = sb.items.map(function (i) { return i.eta; }).filter(Boolean).sort();
+      var when = etas.length ? dmonth(etas[0]) + (dmonth(etas[etas.length - 1]) !== dmonth(etas[0]) ? ' → ' + dmonth(etas[etas.length - 1]) : '') : '';
+      var title = allOver ? 'Overdue' : (selB === upcoming ? 'Next stop' : 'Later');
+      stop = '<div class="stop"><div class="sh"><b>' + title + '</b><span>' + (allOver ? 'was due at ' : '') + (lo === hi ? kk(lo) : kk(lo) + ' – ' + kk(hi)) + (when && !allOver ? ' · ' + esc(when) : '') + '</span></div>' +
+        '<div class="schips">' + sb.items.map(function (i) {
+          return '<button class="ichip" data-act="item" data-n="' + i.n + '"><span class="nb ' + i.status + '">' + i.n + '</span>' + esc(i.short) + '</button>';
+        }).join('') + '</div></div>';
+    }
     var nolog = this._items().filter(function (i) { return i.status === 'nolog'; });
-    var nl = nolog.length ? '<div class="nologrow" aria-label="Never logged"><span class="q">' + I.q + '</span>' + nolog.map(function (i) {
+    var nl = nolog.length ? '<div class="nologrow"><span class="nlt">Never logged</span>' + nolog.map(function (i) {
       return '<button data-act="item" data-n="' + i.n + '" aria-label="' + esc(i.name) + '"><span class="nb nolog">' + i.n + '</span></button>';
-    }).join('') + '</div>' : '';
-    return '<section class="card">' + head + '<div class="road">' + stacks + '<div class="lane"><i style="width:' + odoP.toFixed(1) + '%"></i></div>' +
-      '<span class="now" style="left:' + odoP.toFixed(1) + '%" role="img" aria-label="Now">' + I.truck + '</span>' + ticks + '</div>' + nl + '</section>';
+    }).join('') + '<button class="chip" data-act="catchup">Catch up</button></div>' : '';
+    return '<section class="card roadcard">' + head + '<div class="road" style="height:' + (62 + tall * 32 + 8) + 'px">' + stacks + '<div class="lane"><i style="width:' + odoP.toFixed(1) + '%"></i></div>' +
+      '<span class="now" style="left:' + odoP.toFixed(1) + '%" role="img" aria-label="Now">' + I.truck + '</span>' + ticks + '</div>' + stop + nl + '</section>';
   }
 
   _list(v) {
     var items = this._items();
-    var html = '<section class="card" style="padding-top:8px;padding-bottom:10px" aria-label="Service items">';
+    var self = this;
+    var html = '<section class="card list" style="padding-top:8px;padding-bottom:12px" aria-label="Service items">';
     GROUPS.forEach(function (g) {
       var its = items.filter(function (i) { return i.status === g[0]; });
       if (!its.length) return;
       its.sort(function (a, b) { return (a.remaining == null ? 0 : a.remaining) - (b.remaining == null ? 0 : b.remaining) || a.n - b.n; });
       html += '<div class="grp">' + g[1] + (g[0] === 'nolog' ? '<button data-act="catchup">Catch up</button>' : '') + '</div>';
+      if (g[0] === 'ok') {
+        /* On schedule is the one group nobody needs to read row by row: one line, open on request. */
+        var min = its[0].remaining;
+        var nx = its.filter(function (i) { return i.remaining === min; }).slice(0, 2).map(function (i) { return i.short; }).join(' & ');
+        html += '<button class="goodrow" data-act="good" aria-expanded="' + !!self._showGood + '"><span class="gt"><b>' + its.length + ' on schedule</b><span>next ' + esc(nx) +
+          (min != null ? ' · ' + fmt(min) + ' mi' + (its[0].eta ? ' ≈ ' + esc(dmonth(its[0].eta)) : '') : '') + '</span></span><span class="stackn">' +
+          its.slice(0, 3).map(function (i) { return '<span class="nb ok">' + i.n + '</span>'; }).join('') + (its.length > 3 ? '<span class="nb plus">+' + (its.length - 3) + '</span>' : '') +
+          '</span>' + I.down + '</button>';
+        if (!self._showGood) return;
+      }
       its.forEach(function (i) {
-        var w, val, unit;
-        if (i.status === 'nolog') { w = 100; val = '—'; unit = 'no log'; }
+        var w, val;
+        if (i.status === 'nolog') { w = 100; val = '<span class="val nl">no log</span>'; }
         else {
           var used = i.interval ? (i.interval - (i.remaining || 0)) / i.interval : 0;
           w = Math.max(3, Math.min(100, used * 100));
+          var unit;
           if (i.remaining < 0) { val = fmt(-i.remaining); unit = 'over'; }
           else { val = fmt(i.remaining); unit = i.eta ? '≈ ' + dmonth(i.eta) : 'mi'; }
+          val = '<span class="val ' + i.status + '">' + val + '<small>' + esc(unit) + '</small></span>';
         }
-        html += '<button class="row" data-act="item" data-n="' + i.n + '"><span class="nb ' + i.status + '">' + i.n + '</span><span class="nm">' + esc(i.short) + '</span>' +
-          '<span class="bar"><i class="' + i.status + '" style="width:' + w.toFixed(0) + '%"></i></span>' +
-          '<span class="val ' + i.status + '">' + val + '<small>' + esc(unit) + '</small></span></button>';
+        html += '<button class="row ' + i.status + '" data-act="item" data-n="' + i.n + '"><span class="nb ' + i.status + '">' + i.n + '</span><span class="nm">' + esc(i.short) + '</span>' +
+          '<span class="bar"><i class="' + i.status + '" style="width:' + w.toFixed(0) + '%"></i></span>' + val + '</button>';
       });
     });
     return html + '</section>';
@@ -685,15 +799,113 @@ class GaragePanel extends HTMLElement {
   _logCard(log) {
     var rows = log.slice().sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || (b.odometer || 0) - (a.odometer || 0); });
     var shown = this._showAll ? rows : rows.slice(0, 6);
-    var html = '<section class="card" style="padding-bottom:12px"><div class="hd"><span class="ico">' + I.log + '</span><span class="t">Log</span><span class="chip">' + rows.length + '</span></div><div style="margin-top:8px">';
+    var sched = this._data.vehicle.schedule.items;
+    var short = function (n) { var it = sched.find(function (x) { return x.n === n; }); return it ? it.short : '#' + n; };
+    var BY = { self: 'me', dealer: 'dealer', shop: 'shop' };
+    var html = '<section class="card logcard" style="padding-bottom:12px"><div class="hd"><span class="ico">' + I.log + '</span><span class="t">Log</span></div><div style="margin-top:6px">';
     if (!rows.length) html += '<div class="hatchbox" style="height:48px"></div>';
     shown.forEach(function (e) {
-      html += '<button class="entry" data-act="edit" data-id="' + esc(e.id) + '"><span class="d">' + esc(dshort(e.date)) + (e.edited ? '<span class="edited">edited</span>' : '') + '</span>' +
-        '<span class="o">' + (e.odometer == null ? '—' : fmt(e.odometer)) + '</span><span class="its">' +
-        (e.items || []).map(function (i) { return '<span class="nb plain">' + i.n + '</span>'; }).join('') + '</span></button>';
+      var meta = [e.odometer == null ? '—' : fmt(e.odometer), BY[e.by] || ''].filter(Boolean).join(' · ');
+      html += '<button class="entry" data-act="edit" data-id="' + esc(e.id) + '"><span class="d"><b>' + esc(dyear(e.date)) + (e.edited ? '<span class="edited">edited</span>' : '') + '</b><span>' + esc(meta) + '</span></span><span class="its">' +
+        (e.items || []).map(function (i) { return '<span class="tag">' + esc(short(i.n)) + '</span>'; }).join('') + '</span></button>';
     });
     if (rows.length > 6) html += '<button class="more" data-act="all">' + (this._showAll ? 'Show fewer' : 'Show all ' + rows.length) + '</button>';
     return html + '</div></section>';
+  }
+
+  /* Catch up: one card per never-logged item, each answered on its own (Done at a mileage and
+     date, or Not sure, which writes nothing and stays hatched). "Same visit as" fills a past
+     visit in, and an answer that matches a logged visit joins that entry instead of making a
+     second one at the same mileage. */
+  _catchSheet(s) {
+    var v = this._data.vehicle;
+    var sched = v.schedule.items, items = this._items();
+    var visits = (this._data.log || []).slice().sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); }).slice(0, 4);
+    var KW = { change: 'change', inspect: 'inspect', rotate: 'rotate', grease: 'grease' };
+    var html = '<div class="grab" aria-hidden="true"></div><div class="shd"><span class="t">Catch up</span><span class="chip" style="margin-left:0">' + s.items.length + ' never logged</span>' +
+      '<button class="x" data-act="close" aria-label="Close">' + I.x + '</button></div>';
+    if (visits.length) {
+      html += '<div class="cuv"><span class="eyebrow">Same visit as</span><div class="visits">' + visits.map(function (e) {
+        return '<button data-act="visit" data-id="' + esc(e.id) + '" aria-pressed="' + (s.visit === e.id) + '">' + esc(dyear(e.date)) + (e.odometer != null ? ' · ' + fmt(e.odometer) : '') + '</button>';
+      }).join('') + '</div></div>';
+    }
+    html += '<div class="cus">' + s.items.map(function (n) {
+      var it = sched.find(function (x) { return x.n === n; }) || {}, st = items.find(function (x) { return x.n === n; }) || {};
+      var a = s.ans[n] || {};
+      var done = a.mode === 'done';
+      var h = '<div class="cu"><div class="cuh"><span class="nb ' + (done ? 'sel' : 'nolog') + '">' + n + '</span><span class="cut"><b>' + esc(it.name || it.short) + '</b><span>' +
+        esc((KW[it.kind] || 'change') + (st.interval ? ' every ' + k(st.interval) : '')) + '</span></span>' +
+        '<div class="seg sm" role="group" aria-label="' + esc(it.short) + '"><button data-act="cu" data-n="' + n + '" data-m="done" aria-pressed="' + done + '">Done</button>' +
+        '<button data-act="cu" data-n="' + n + '" data-m="unsure" aria-pressed="' + (a.mode === 'unsure') + '">Not sure</button></div></div>';
+      if (done) {
+        h += '<div class="fields"><div class="fld"><label for="g-cu-o' + n + '">Odometer</label><input id="g-cu-o' + n + '" data-cu-odo="' + n + '" inputmode="numeric" autocomplete="off" placeholder="miles" value="' + esc(a.odo ? fmt(String(a.odo).replace(/[^0-9.]/g, '')) : '') + '"></div>' +
+          '<div class="fld"><label for="g-cu-d' + n + '">Date</label><input id="g-cu-d' + n + '" data-cu-date="' + n + '" type="date" max="' + today() + '" value="' + esc(a.date || '') + '"></div></div>';
+      }
+      return h + '</div>';
+    }).join('') + '</div>';
+    html += '<div class="err" role="alert" hidden></div>';
+    var cnt = s.items.filter(function (n) { return (s.ans[n] || {}).mode === 'done'; }).length;
+    html += '<button class="pri" data-act="cusave"' + (cnt ? '' : ' disabled') + '>' + I.check + (cnt ? 'Log ' + cnt + (cnt === 1 ? ' item' : ' items') : 'Mark what you know') + '</button>';
+    return html;
+  }
+
+  /* Typed text lives in the inputs; copy it into the sheet state before anything re-renders. */
+  _cuSync() {
+    var s = this._sheet;
+    if (!s || s.kind !== 'catchup') return;
+    this.shadowRoot.querySelectorAll('[data-cu-odo]').forEach(function (el) { (s.ans[el.dataset.cuOdo] = s.ans[el.dataset.cuOdo] || {}).odo = el.value; });
+    this.shadowRoot.querySelectorAll('[data-cu-date]').forEach(function (el) { (s.ans[el.dataset.cuDate] = s.ans[el.dataset.cuDate] || {}).date = el.value; });
+  }
+
+  _cuFill(a, id) {
+    var e = (this._data.log || []).find(function (x) { return x.id === id; });
+    if (!e) return;
+    a.odo = e.odometer == null ? '' : String(Math.round(e.odometer));
+    a.date = e.date || '';
+    a.from = id;
+  }
+
+  async _cuSave() {
+    if (this._busy) return;
+    this._cuSync();
+    var s = this._sheet, v = this._data.vehicle, self = this;
+    var sched = v.schedule.items;
+    var KIND = { change: 'changed', inspect: 'inspected', rotate: 'rotated', grease: 'greased' };
+    var done = s.items.filter(function (n) { return (s.ans[n] || {}).mode === 'done'; });
+    var odoOf = function (n) { var o = String(s.ans[n].odo || '').replace(/[^0-9.]/g, ''); return o === '' ? null : Math.round(+o); };
+    var missing = done.filter(function (n) { return odoOf(n) == null || !s.ans[n].date; });
+    if (missing.length) {
+      this._sheetError('Add the odometer and date for ' + missing.map(function (n) { return sched.find(function (x) { return x.n === n; }).short; }).join(', ') + '.');
+      return;
+    }
+    var groups = {};
+    done.forEach(function (n) { var key = odoOf(n) + '|' + s.ans[n].date; (groups[key] = groups[key] || []).push(n); });
+    this._busy = true;
+    var btn = this.shadowRoot.querySelector('[data-act="cusave"]');
+    if (btn) btn.disabled = true;
+    try {
+      for (var key in groups) {
+        var odo = +key.split('|')[0], date = key.split('|')[1];
+        var rows = groups[key].map(function (n) { return { n: n, action: KIND[sched.find(function (x) { return x.n === n; }).kind] || 'changed' }; });
+        var same = (self._data.log || []).find(function (e) { return e.date === date && e.odometer != null && Math.round(e.odometer) === odo; });
+        if (same) {
+          var have = (same.items || []).map(function (i) { return i.n; });
+          await self._hass.callWS({ type: 'garage/update', entry_id: v.entry_id, log_id: same.id,
+            entry: { items: (same.items || []).concat(rows.filter(function (r) { return have.indexOf(r.n) < 0; })) } });
+        } else {
+          await self._hass.callWS({ type: 'garage/add', entry_id: v.entry_id, entry: { odometer: odo, date: date, items: rows } });
+        }
+      }
+      await this._load();
+      this._close();
+      this._toast(done.length === 1 ? 'Logged' : 'Logged ' + done.length + ' items');
+    } catch (e) {
+      this._sheetError((e && e.message) || 'Could not save.');
+      await this._load();
+    } finally {
+      this._busy = false;
+      if (btn) btn.disabled = false;
+    }
   }
 
   /* ------------------------------------------------------------------ sheets */
@@ -713,7 +925,7 @@ class GaragePanel extends HTMLElement {
   _renderSheet(keep) {
     var s = this._sheet;
     if (!s || !this._data || !this._data.vehicle) return;
-    var body = s.kind === 'item' ? this._itemSheet(s.n) : s.kind === 'poster' ? this._posterSheet() : this._logSheet(s);
+    var body = s.kind === 'item' ? this._itemSheet(s.n) : s.kind === 'poster' ? this._posterSheet() : s.kind === 'catchup' ? this._catchSheet(s) : this._logSheet(s);
     var inner = this._sw.querySelector('.sheet .in');
     if (keep && inner) { var y = inner.scrollTop; inner.innerHTML = body; inner.scrollTop = y; return; }
     this._sw.innerHTML = '<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true"><div class="in">' + body + '</div></div>';
@@ -872,9 +1084,34 @@ class GaragePanel extends HTMLElement {
     if (a === 'log') { this._open({ kind: 'log', sel: n ? [n] : [] }); return; }
     if (a === 'catchup') {
       var nl = this._items().filter(function (i) { return i.status === 'nolog'; }).map(function (i) { return i.n; });
-      this._open({ kind: 'log', sel: [], catchup: true, hint: nl });
+      this._open({ kind: 'catchup', items: nl, ans: {}, visit: null });
       return;
     }
+    if (a === 'stop') { this._stop = +el.dataset.b; this._render(); return; }
+    if (a === 'good') { this._showGood = !this._showGood; this._render(); return; }
+    if (a === 'cu') {
+      this._cuSync();
+      var cs = this._sheet, ca = cs.ans[n] = cs.ans[n] || {};
+      ca.mode = ca.mode === el.dataset.m ? null : el.dataset.m;
+      if (ca.mode === 'done' && !ca.odo && !ca.date && cs.visit) this._cuFill(ca, cs.visit);
+      this._renderSheet(true);
+      return;
+    }
+    if (a === 'visit') {
+      this._cuSync();
+      var vs = this._sheet, prev = vs.visit, self2 = this;
+      vs.visit = prev === el.dataset.id ? null : el.dataset.id;
+      vs.items.forEach(function (k2) {
+        var x = vs.ans[k2];
+        if (!x || x.mode !== 'done') return;
+        var untouched = (!x.odo && !x.date) || (x.from && x.from === prev);
+        if (!untouched) return;
+        if (vs.visit) self2._cuFill(x, vs.visit); else { x.odo = ''; x.date = ''; x.from = null; }
+      });
+      this._renderSheet(true);
+      return;
+    }
+    if (a === 'cusave') { this._cuSave(); return; }
     if (a === 'edit') {
       var en = (this._data.log || []).find(function (x) { return x.id === el.dataset.id; });
       var acts = {};
