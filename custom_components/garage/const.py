@@ -25,6 +25,7 @@ SIGNAL_UPDATED = "garage_updated_{}"
 
 SERVICE_LOG = "log_service"
 SERVICE_PROFILE = "set_profile"
+SERVICE_EXPORT = "export_record"
 
 # An odometer that jumps further than this between two readings is held back until it
 # repeats: a single garbage frame from the bus must not mark every service as done.

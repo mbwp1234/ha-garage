@@ -42,10 +42,12 @@ from .const import (
     PANEL_TITLE,
     PANEL_URL_PATH,
     SERVICE_LOG,
+    SERVICE_EXPORT,
     SERVICE_PROFILE,
     SIGNAL_UPDATED,
 )
 from .schedule import DEFAULT_ACTION, ItemStatus, compute, load_schedule, pace_per_day, summary
+from . import export as gexport
 from . import stats as gstats
 from .store import GarageError, GarageStore, StoreConfig
 
@@ -278,7 +280,9 @@ async def _async_register_globals(hass: HomeAssistant) -> None:
         websocket_api.async_register_command(hass, ws_update)
         websocket_api.async_register_command(hass, ws_delete)
         websocket_api.async_register_command(hass, ws_profile)
+        websocket_api.async_register_command(hass, ws_export)
         hass.http.register_view(GarageImageView())
+        hass.http.register_view(GarageRecordView())
         # Registered even before a panel file exists: routes can't be added later without a restart.
         await hass.http.async_register_static_paths([StaticPathConfig(PANEL_JS_URL, str(PANEL_FILE), False)])
         _register_services(hass)
@@ -408,6 +412,18 @@ def _register_services(hass: HomeAssistant) -> None:
         }),
         supports_response=SupportsResponse.OPTIONAL,
     )
+    async def export_record(call: ServiceCall) -> ServiceResponse:
+        rt = _rt(hass, call.data.get("vehicle"))
+        r = await async_export(rt, call.data.get("costs", False), True)
+        if r["save_error"]:
+            raise HomeAssistantError(f"Service record not saved: {r['save_error']}")
+        return {"folder": r["saved"], "files": list(r["names"].values())}
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_EXPORT, export_record,
+        schema=vol.Schema({vol.Optional("vehicle"): cv.string, vol.Optional("costs", default=False): cv.boolean}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
     hass.services.async_register(
         DOMAIN, SERVICE_PROFILE, set_profile,
         schema=vol.Schema({
@@ -486,6 +502,69 @@ async def ws_delete(hass, connection, msg):
 @websocket_api.async_response
 async def ws_profile(hass, connection, msg):
     await _ws_write(hass, connection, msg, lambda rt, name: rt.store.set_profile(msg["n"], msg["profile"]))
+
+
+async def async_export(rt: GarageRuntime, costs: bool = False, save: bool = True) -> dict[str, Any]:
+    """The service record for a sale: printable HTML and a CSV, also saved under exports/."""
+    hass = rt.hass
+
+    def work():
+        entries = rt.store.entries() if rt.store.status()["has_log"] else []
+        settings = rt.store.settings() if rt.store.status()["exists"] else {}
+        return entries, settings
+
+    entries, settings = await hass.async_add_executor_job(work)
+    today = dt_util.now().date()
+    info = settings.get("vehicle") if isinstance(settings.get("vehicle"), dict) else {}
+    title = gexport.vehicle_title(rt.name, info)
+    page = gexport.build_html(rt.schedule, entries, rt.statuses, rt.name, rt.odometer, today, info, costs)
+    table = gexport.build_csv(rt.schedule, entries, costs)
+    names = {"html": gexport.filename(title, today, "html"), "csv": gexport.filename(title, today, "csv")}
+    saved, save_error = None, None
+    if save:
+        try:
+            saved = await hass.async_add_executor_job(
+                rt.store.save_export, {names["html"]: page, names["csv"]: table})
+        except (GarageError, OSError) as err:
+            save_error = str(err)
+    return {"html": page, "csv": table, "names": names, "saved": saved, "save_error": save_error,
+            "has_costs": gexport.has_costs(entries)}
+
+
+@websocket_api.websocket_command({vol.Required("type"): "garage/export", vol.Optional("entry_id"): str,
+                                  vol.Optional("costs", default=False): bool,
+                                  vol.Optional("save", default=True): bool})
+@websocket_api.async_response
+async def ws_export(hass, connection, msg):
+    try:
+        rt = _rt(hass, msg.get("entry_id"))
+        result = await async_export(rt, msg["costs"], msg["save"])
+    except (GarageError, HomeAssistantError) as err:
+        connection.send_error(msg["id"], "failed", str(err))
+        return
+    connection.send_result(msg["id"], result)
+
+
+class GarageRecordView(HomeAssistantView):
+    """The service record as a page (or CSV). Opened from the panel through a signed path."""
+
+    url = "/api/garage/{entry_id}/record.{ext}"
+    name = "api:garage:record"
+    requires_auth = True
+
+    async def get(self, request, entry_id, ext):
+        from aiohttp import web
+
+        hass = request.app["hass"]
+        rt = runtimes(hass).get(entry_id)
+        if rt is None or ext not in ("html", "csv"):
+            return web.Response(status=404)
+        r = await async_export(rt, request.query.get("costs") == "1", save=False)
+        headers = {"Cache-Control": "no-store"}
+        if ext == "csv":
+            headers["Content-Disposition"] = f'attachment; filename="{r["names"]["csv"]}"'
+            return web.Response(text=r["csv"], content_type="text/csv", charset="utf-8", headers=headers)
+        return web.Response(text=r["html"], content_type="text/html", charset="utf-8", headers=headers)
 
 
 class GarageImageView(HomeAssistantView):
