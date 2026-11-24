@@ -134,3 +134,9 @@ def test_panel_opens_the_url_the_view_serves():
     assert 'url = "/api/garage/{entry_id}/record.{ext}"' in init
     assert "register_view(GarageRecordView())" in init
     assert "register_command(hass, ws_export)" in init
+
+
+def test_export_refreshes_before_building():
+    init = (ROOT / "__init__.py").read_text()
+    body = init.split("async def async_export")[1].split("def work")[0]
+    assert "await rt.async_refresh()" in body and "if not rt.statuses" in body
