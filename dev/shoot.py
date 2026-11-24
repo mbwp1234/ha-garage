@@ -135,7 +135,10 @@ def main() -> None:
         for nm, sel in [("sheet-item", f"[data-act=item][data-n='{a.item}']"), ("sheet-log", "[data-act=log]"),
                         ("sheet-map", "[data-act=poster]"), ("sheet-catchup", "[data-act=catchup]"),
                         ("sheet-edit", "[data-act=edit]")]:
-            pg.evaluate("s => el.shadowRoot.querySelector(s).click()", sel)
+            if nm == "sheet-item":  # any item, even one the list has folded away
+                pg.evaluate("n => el._open({ kind: 'item', n: n })", a.item)
+            else:
+                pg.evaluate("s => el.shadowRoot.querySelector(s).click()", sel)
             pg.wait_for_timeout(500)
             pg.screenshot(path=str(OUT / f"{nm}.png"))
             pg.evaluate("() => el.shadowRoot.querySelector('[data-act=close].x').click()")

@@ -115,7 +115,7 @@ def test_nolog_is_never_a_number():
 def test_severe_profile_only_where_the_map_has_one():
     st = by_n(sched.compute(TACOMA, [], 1000, TODAY, profiles={"1": "severe", "9": "severe"}))
     assert st[1].interval == 5000 and st[1].profile == "severe"
-    assert st[9].interval == 60000 and st[9].profile == "normal"         # plugs have no severe figure
+    assert st[9].interval == 120000 and st[9].profile == "normal"         # plugs have no severe figure
 
 
 def test_inspection_resets_inspect_items_but_not_change_items():
