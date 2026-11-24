@@ -79,3 +79,13 @@ def test_set_profile(gs):
     assert s["profile"]["1"] == "severe"
     with pytest.raises(store.GarageError):
         gs.set_profile(1, "extreme")
+
+
+def test_typed_odometer_is_dated_and_validated(gs):
+    r = gs.set_odometer("41,250")
+    assert r["miles"] == 41250 and r["date"] == TODAY.isoformat()
+    assert gs.settings()["odometer"]["miles"] == 41250
+    for bad in ("", "abc", 0, -5, 3_000_000):
+        with pytest.raises(store.GarageError):
+            gs.set_odometer(bad)
+    assert gs.settings()["odometer"]["miles"] == 41250   # a refused reading leaves the last one alone

@@ -7,7 +7,7 @@
         "data": {
           "name": "Vehicle name",
           "schedule": "Maintenance schedule",
-          "odometer_entity": "Odometer sensor",
+          "odometer_entity": "Odometer sensor (optional: without one, type the mileage in the panel)",
           "fuel_entity": "Fuel level sensor (optional)",
           "tank_size": "Tank size (litres, optional)",
           "mount_path": "Share mount path",
@@ -32,7 +32,7 @@
         "data": {
           "name": "Vehicle name",
           "schedule": "Maintenance schedule",
-          "odometer_entity": "Odometer sensor",
+          "odometer_entity": "Odometer sensor (optional: without one, type the mileage in the panel)",
           "fuel_entity": "Fuel level sensor (optional)",
           "tank_size": "Tank size (litres, optional)",
           "mount_path": "Share mount path",
@@ -111,6 +111,20 @@
         "costs": {
           "name": "Include costs",
           "description": "Add a cost column when any costs were logged."
+        }
+      }
+    },
+    "set_odometer": {
+      "name": "Set odometer",
+      "description": "Record the current mileage by hand, for a vehicle without an odometer sensor.",
+      "fields": {
+        "vehicle": {
+          "name": "Vehicle",
+          "description": "Optional with one vehicle."
+        },
+        "miles": {
+          "name": "Miles",
+          "description": "What the dash reads now."
         }
       }
     }

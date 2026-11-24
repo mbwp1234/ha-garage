@@ -245,6 +245,20 @@ class GarageStore:
                 (out / name).write_text(text, encoding="utf-8")
         return str(out)
 
+    def set_odometer(self, miles: Any) -> dict[str, Any]:
+        """A reading typed off the dash, for a vehicle with no odometer sensor. Dated today."""
+        try:
+            m = int(round(float(str(miles).replace(",", ""))))
+        except (TypeError, ValueError) as err:
+            raise GarageError("Mileage must be a number of miles.") from err
+        if not 0 < m <= 2_000_000:
+            raise GarageError("Mileage is out of range.")
+        with self._lock:
+            s = self.settings()
+            s["odometer"] = {"miles": m, "date": self._today().isoformat(), "at": _now_iso()}
+            self._write(SETTINGS_FILE, s)
+            return s["odometer"]
+
     def set_profile(self, n: int, profile: str) -> dict[str, Any]:
         if n not in self.valid_items:
             raise GarageError(f"Unknown item {n}.")

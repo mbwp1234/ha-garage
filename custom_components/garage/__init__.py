@@ -43,6 +43,7 @@ from .const import (
     PANEL_URL_PATH,
     SERVICE_LOG,
     SERVICE_EXPORT,
+    SERVICE_ODOMETER,
     SERVICE_PROFILE,
     SIGNAL_UPDATED,
 )
@@ -68,7 +69,7 @@ class GarageRuntime:
     name: str
     schedule: dict[str, Any]
     store: GarageStore
-    odometer_entity: str
+    odometer_entity: str | None
     fuel_entity: str | None
     tank_l: float | None
     odometer: float | None = None           # last known; None = never read (not zero)
@@ -102,6 +103,7 @@ class GarageRuntime:
             async_dispatcher_send(self.hass, SIGNAL_UPDATED.format(self.entry_id))
             return
         self.storage = st
+        self._known_odometer(settings.get("odometer"), entries)
         self.assumed_mpg = settings.get("mpg") if isinstance(settings.get("mpg"), (int, float)) else None
         self.statuses = compute(self.schedule, entries, self.odometer, dt_util.now().date(),
                                 settings.get("profile", {}), settings.get("months", {}))
@@ -111,6 +113,22 @@ class GarageRuntime:
         self.points = sorted([e["date"], e["odometer"]] for e in entries
                              if e.get("odometer") is not None and e.get("date"))
         async_dispatcher_send(self.hass, SIGNAL_UPDATED.format(self.entry_id))
+
+    def _known_odometer(self, typed: Any, entries: list[dict[str, Any]]) -> None:
+        """Without a sensor the odometer is the newest thing anyone wrote down: a typed reading or
+        the highest logged mileage. With one, a typed reading only ever moves it forward."""
+        cands = []
+        if isinstance(typed, dict) and isinstance(typed.get("miles"), (int, float)):
+            cands.append((float(typed["miles"]), typed.get("at") or typed.get("date")))
+        if not self.odometer_entity:
+            for e in entries:
+                if e.get("odometer") is not None:
+                    cands.append((float(e["odometer"]), e.get("date")))
+        if not cands:
+            return
+        miles, when = max(cands, key=lambda c: c[0])
+        if self.odometer is None or miles > self.odometer or not self.odometer_entity:
+            self.odometer, self.odometer_as_of = miles, when
 
     def economy(self) -> dict[str, Any]:
         last = self.stats.get("fuel_last") or {}
@@ -125,7 +143,7 @@ class GarageRuntime:
 
     def device_info(self) -> dict[str, Any]:
         """Join the device that owns the odometer (e.g. the OBD dongle) so the vehicle is one device."""
-        ent = er.async_get(self.hass).async_get(self.odometer_entity)
+        ent = er.async_get(self.hass).async_get(self.odometer_entity) if self.odometer_entity else None
         if ent and ent.device_id:
             dev = dr.async_get(self.hass).async_get(ent.device_id)
             if dev and dev.identifiers:
@@ -148,7 +166,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                         {int(it["n"]) for it in schedule["items"]}, today=lambda: dt_util.now().date())
     tank = float(s.get(CONF_TANK) or 0) or None
     rt = GarageRuntime(hass, entry.entry_id, s.get(CONF_NAME) or entry.title, schedule, store,
-                       s[CONF_ODOMETER], s.get(CONF_FUEL) or None, tank)
+                       s.get(CONF_ODOMETER) or None, s.get(CONF_FUEL) or None, tank)
     rt.battery_entity = s.get(CONF_BATTERY) or None
     runtimes(hass)[entry.entry_id] = rt
     try:
@@ -281,6 +299,7 @@ async def _async_register_globals(hass: HomeAssistant) -> None:
         websocket_api.async_register_command(hass, ws_delete)
         websocket_api.async_register_command(hass, ws_profile)
         websocket_api.async_register_command(hass, ws_export)
+        websocket_api.async_register_command(hass, ws_odometer)
         hass.http.register_view(GarageImageView())
         hass.http.register_view(GarageRecordView())
         # Registered even before a panel file exists: routes can't be added later without a restart.
@@ -412,6 +431,19 @@ def _register_services(hass: HomeAssistant) -> None:
         }),
         supports_response=SupportsResponse.OPTIONAL,
     )
+    async def set_odometer(call: ServiceCall) -> None:
+        rt = _rt(hass, call.data.get("vehicle"))
+        try:
+            await hass.async_add_executor_job(rt.store.set_odometer, call.data["miles"])
+        except GarageError as err:
+            raise HomeAssistantError(str(err)) from err
+        await rt.async_refresh()
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_ODOMETER, set_odometer,
+        schema=vol.Schema({vol.Optional("vehicle"): cv.string, vol.Required("miles"): vol.Coerce(float)}),
+    )
+
     async def export_record(call: ServiceCall) -> ServiceResponse:
         rt = _rt(hass, call.data.get("vehicle"))
         r = await async_export(rt, call.data.get("costs", False), True)
@@ -438,7 +470,8 @@ def _register_services(hass: HomeAssistant) -> None:
 @websocket_api.async_response
 async def ws_get(hass, connection, msg):
     rts = runtimes(hass)
-    vehicles = [{"entry_id": r.entry_id, "name": r.name} for r in rts.values()]
+    vehicles = [{"entry_id": r.entry_id, "name": r.name,
+                 "summary": {k: r.summary.get(k, 0) for k in ("over", "soon", "nolog")}} for r in rts.values()]
     if not rts:
         connection.send_result(msg["id"], {"vehicles": [], "vehicle": None})
         return
@@ -548,6 +581,13 @@ async def ws_export(hass, connection, msg):
         connection.send_error(msg["id"], "failed", str(err))
         return
     connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command({vol.Required("type"): "garage/set_odometer", vol.Optional("entry_id"): str,
+                                  vol.Required("miles"): vol.Coerce(float)})
+@websocket_api.async_response
+async def ws_odometer(hass, connection, msg):
+    await _ws_write(hass, connection, msg, lambda rt, name: rt.store.set_odometer(msg["miles"]))
 
 
 class GarageRecordView(HomeAssistantView):

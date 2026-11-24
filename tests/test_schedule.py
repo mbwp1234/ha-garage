@@ -161,3 +161,44 @@ def test_summary_counts_and_next():
                                              (60000, (2000, 60)), (100000, (3000, 90))])
 def test_soon_windows(interval, window):
     assert sched.soon_window(interval) == window
+
+
+# ------------------------------------------------------------ the Kona: Hyundai's "miles or months"
+
+KONA = sched.load_schedule("hyundai_kona_os_16t_awd")
+
+
+def test_kona_schedule_is_well_formed():
+    assert [it["n"] for it in KONA["items"]] == list(range(1, 13))
+    for it in KONA["items"]:
+        assert it["zone"] in KONA["zones"] and it["kind"] in sched.RESETS, it["n"]
+        assert isinstance(it["parts"], list) and isinstance(it["torque"], list)
+
+
+def test_kona_figures_match_the_2022_manual():
+    k = {it["id"]: it for it in KONA["items"]}
+    assert (k["oil"]["normal"], k["oil"]["severe"], k["oil"]["months"], k["oil"]["severe_months"]) == (8000, 5000, 12, 6)
+    assert k["plugs"]["normal"] == 48000 and k["cabin"]["normal"] == 16000 and k["air"]["normal"] == 24000
+    assert (k["coolant"]["first"], k["coolant"]["normal"], k["coolant"]["months"]) == (120000, 24000, 24)
+    assert k["dct"]["kind"] == "inspect" and k["dct"]["normal"] == 40000
+    assert k["tcase"]["normal"] == k["rdiff"]["normal"] == 32000
+
+
+def test_schedule_months_apply_and_severe_months_follow_the_profile():
+    log = [entry(40000, "2025-10-01", (1, "changed"))]
+    normal = by_n(sched.compute(KONA, log, 41000, TODAY))[1]
+    severe = by_n(sched.compute(KONA, log, 41000, TODAY, profiles={"1": "severe"}))[1]
+    assert normal.months == 12 and normal.due_date == "2026-10-01" and normal.status == "ok"
+    assert severe.months == 6 and severe.due_date == "2026-04-01" and severe.status == "over"
+    # a settings override still wins
+    assert by_n(sched.compute(KONA, log, 41000, TODAY, months={"1": 3}))[1].months == 3
+
+
+def test_tacoma_still_has_no_month_limits():
+    log = [entry(50000, "2020-01-01", (1, "changed"))]
+    assert by_n(sched.compute(TACOMA, log, 50100, TODAY))[1].due_date is None
+
+
+def test_kona_with_no_mileage_is_all_nolog_not_zero():
+    st = sched.compute(KONA, [], None, TODAY)
+    assert {s.status for s in st} == {"nolog"} and all(s.remaining is None for s in st)
