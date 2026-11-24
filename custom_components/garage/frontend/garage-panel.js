@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.5.1';
+var VERSION = '0.5.2';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 

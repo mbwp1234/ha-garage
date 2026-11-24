@@ -64,6 +64,9 @@
   },
   "quirks": {
     "_about": "Marks on the printed poster that its own stated intervals do not produce. The engine follows the intervals; these are listed so the test can tell a known poster slip from a new transcription or schedule error.",
+    "60000": {"normal": [9], "why": "Spark plugs: the map says 60k; this schedule follows Toyota's 120k."},
+    "180000": {"normal": [9], "why": "Spark plugs: the map says 60k; this schedule follows Toyota's 120k."},
+    "300000": {"normal": [9], "why": "Spark plugs: the map says 60k; this schedule follows Toyota's 120k."},
     "160000": {"severe": [12], "why": "Severe ATF counted 60k from the 100k normal change, not from zero."},
     "260000": {"severe": [12], "normal": [9], "why": "Severe ATF 60k after the 200k change; spark plugs (60k) are due at 240k and 300k, not 260k."},
     "290000": {"severe": [6], "why": "Severe transfer case (30k) falls at 270k and 300k, not 290k."}
