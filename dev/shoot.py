@@ -37,6 +37,12 @@ def fixture(folder: Path, odometer: float, schedule_id: str, states: dict) -> di
     today = date.today()
     st = sched.compute(s, log, odometer, today, settings.get("profile", {}), settings.get("months", {}))
     pace = sched.pace_per_day(log, odometer, today)
+    gst = _load("stats")
+    st_file = folder / "stats.json"
+    stats = json.loads(st_file.read_text()) if st_file.exists() else gst.empty()
+    last = stats.get("fuel_last") or {}
+    eco = gst.economy(stats, 79.9, odometer, last.get("litres"))
+    mpg = eco["mpg"] or settings.get("mpg")
     vehicle = {
         "entry_id": "dev", "name": "Tacoma" if "taco" in folder.name.lower() else "Example", "error": None,
         "storage": {"mounted": True, "exists": True, "has_log": True}, "odometer": odometer,
@@ -45,6 +51,10 @@ def fixture(folder: Path, odometer: float, schedule_id: str, states: dict) -> di
         "fuel": None, "schedule": s, "summary": sched.summary(st), "pace": None if pace is None else round(pace, 1),
         "points": sorted([e["date"], e["odometer"]] for e in log if e.get("odometer") is not None),
         "items": [x.as_dict() for x in st],
+        "economy": {"mpg": eco["mpg"], "segments": eco["segments"], "range": gst.range_miles(last.get("litres"), mpg),
+                    "range_basis": ("learned" if eco["mpg"] else "assumed") if mpg else None, "litres": last.get("litres"),
+                    "as_of": last.get("at"), "percent": None},
+        "refuels": stats.get("refuels", [])[-12:], "rest": stats.get("rest", [])[-40:], "battery_entity": None,
     }
     return {"vehicles": [{"entry_id": "dev", "name": vehicle["name"]}], "vehicle": vehicle, "log": log,
             "settings": settings, "states": states}

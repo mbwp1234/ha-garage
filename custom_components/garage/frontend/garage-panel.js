@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.2.0';
+var VERSION = '0.4.0';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
@@ -199,6 +199,8 @@ var I = {
   batt: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M7 7V5M17 7V5M7 13h3M15.5 11.5v3M14 13h3"/></svg>',
   trim: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h16M12 4v16"/><circle cx="9" cy="12" r="2.5" fill="currentColor"/></svg>',
   flag: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+  gauge: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l3.5-5.5"/></svg>',
+  engine: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h2V8h4V6h4v2h2l2 2h2v6h-2l-2 2H8l-2-2H4z"/></svg>',
   temp: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/></svg>'
 };
 
@@ -333,9 +335,6 @@ class GaragePanel extends HTMLElement {
      never a zero and never a blank that looks like one. */
   async _loadLastKnown() {
     var ents = this._tileEntities().filter(function (id) { return num(this._hass.states[id]) === null; }, this);
-    if (this._data && this._data.vehicle && this._data.vehicle.fuel_entity && num(this._hass.states[this._data.vehicle.fuel_entity]) === null) {
-      ents.push(this._data.vehicle.fuel_entity);
-    }
     ents = ents.filter(function (id) { return !this._lastKnown[id]; }, this);
     if (!ents.length) return;
     var start = new Date(Date.now() - 10 * 86400000).toISOString();
@@ -363,6 +362,7 @@ class GaragePanel extends HTMLElement {
     (s.tiles || []).forEach(function (t) {
       if (t.entity) out.push(t.entity);
       (t.entities || []).forEach(function (e) { out.push(e); });
+      [t.mil, t.count, t.since].forEach(function (e) { if (e) out.push(e); });
     });
     return out;
   }
@@ -543,15 +543,44 @@ class GaragePanel extends HTMLElement {
     var v = this._data.vehicle;
     var miss = function (icon, label) { return '<div class="tl">' + icon + esc(label) + '</div><div class="num">—</div><div class="gfx"><div class="hatchbox"></div></div>'; };
     if (t.kind === 'fuel') {
+      var e = v.economy || {};
       var r = v.fuel_entity ? this._reading(v.fuel_entity) : null;
+      /* Live while the truck is awake; otherwise the integration's last real reading, with its age. */
+      if (!r && e.litres != null) r = { v: e.litres, live: false, at: e.as_of };
       if (!r || !v.tank_l) return miss(I.fuel, 'Fuel');
       var pc = Math.max(0, Math.min(100, r.v / v.tank_l * 100));
       var gal = r.v / 3.78541;
-      var mpg = this._data.settings.mpg;
+      var mpg = e.mpg || (e.range_basis === 'assumed' ? (this._data.settings || {}).mpg : null);
+      var rng = mpg ? Math.round(gal * mpg / 10) * 10 : null;
       return this._tl(I.fuel, 'Fuel', r) + '<div class="num">' + Math.round(pc) + '<small>%</small></div><div class="gfx"><div class="tank" role="img" aria-label="Tank ' + Math.round(pc) + ' percent"><i style="width:' + pc.toFixed(0) + '%"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div>' +
-        '<div class="mini" style="margin-top:6px">' + gal.toFixed(1) + ' gal' + (mpg ? ' · ≈ ' + fmt(Math.round(gal * mpg / 10) * 10) + ' mi' : '') + '</div></div>';
+        '<div class="mini" style="margin-top:6px">' + gal.toFixed(1) + ' gal' + (rng ? ' · ' + (e.mpg ? '' : '≈ ') + fmt(rng) + ' mi' : '') + '</div></div>';
+    }
+    if (t.kind === 'economy') {
+      var ec = v.economy || {};
+      var fills = (v.refuels || []).length;
+      if (ec.mpg == null) {
+        return '<div class="tl">' + I.gauge + 'Economy</div><div class="num">—</div><div class="gfx"><div class="hatchbox"></div>' +
+          '<div class="mini" style="margin-top:6px">learning · ' + fills + ' fill-up' + (fills === 1 ? '' : 's') + '</div></div>';
+      }
+      var segs = Math.max(1, ec.segments || 1);
+      var dots = ''; for (var di = 0; di < 3; di++) dots += '<i style="flex:1;height:8px;border-radius:4px;background:' + (di < segs ? 'var(--cav)' : 'var(--track)') + '"></i>';
+      return '<div class="tl">' + I.gauge + 'Economy</div><div class="num">' + ec.mpg.toFixed(1) + '<small>mpg</small></div><div class="gfx"><div style="display:flex;gap:4px" role="img" aria-label="' + segs + ' tanks measured">' + dots + '</div>' +
+        '<div class="mini" style="margin-top:6px">' + fills + ' fill-ups</div></div>';
     }
     if (t.kind === 'battery') {
+      var rest = (v.rest || []).map(function (x) { return x.v; });
+      if (rest.length) {
+        var lastV = rest[rest.length - 1];
+        var lo = 11.8, hi = 13.2, W = 146, H = 46;
+        var y = function (x) { return (H - (Math.max(lo, Math.min(hi, x)) - lo) / (hi - lo) * H + 2).toFixed(1); };
+        var step = rest.length > 1 ? W / (rest.length - 1) : 0;
+        var pts = rest.map(function (x, i) { return (1 + i * step).toFixed(1) + ',' + y(x); }).join(' ');
+        var bandTop = y(12.8), bandBot = y(12.4);
+        return '<div class="tl">' + I.batt + 'Battery<span class="age">at rest</span></div><div class="num">' + lastV.toFixed(1) + '<small>V</small></div><div class="gfx"><svg viewBox="0 0 148 50" width="100%" height="50" role="img" aria-label="Battery at rest, last ' + rest.length + ' drives">' +
+          '<rect x="0" y="' + bandTop + '" width="148" height="' + (bandBot - bandTop).toFixed(1) + '" rx="4" fill="color-mix(in srgb,var(--ok) 22%,transparent)"/>' +
+          (rest.length > 1 ? '<polyline points="' + pts + '" fill="none" stroke="var(--cav)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>' : '') +
+          '<circle cx="' + (1 + (rest.length - 1) * step).toFixed(1) + '" cy="' + y(lastV) + '" r="3.5" fill="var(--cav)"/></svg></div>';
+      }
       var b = this._reading(t.entity);
       if (!b) return miss(I.batt, 'Battery');
       var p = Math.max(0, Math.min(100, (b.v - 11.5) / 3.5 * 100));
@@ -559,6 +588,16 @@ class GaragePanel extends HTMLElement {
         '<span class="band" style="left:0;width:20%;background:color-mix(in srgb,var(--over) 30%,transparent)"></span>' +
         '<span class="band" style="left:54%;width:40%;background:color-mix(in srgb,var(--ok) 30%,transparent)"></span>' +
         '<span class="mk" style="left:' + p.toFixed(1) + '%"></span></div></div>';
+    }
+    if (t.kind === 'codes') {
+      var mil = this._reading(t.mil), cnt = this._reading(t.count), since = t.since ? this._reading(t.since) : null;
+      if (!mil && !cnt) return miss(I.engine, 'Engine');
+      var on = mil && mil.v >= 1, n = cnt ? Math.round(cnt.v) : null;
+      var sinceMi = since ? (since.unit === 'km' ? since.v * 0.621371 : since.v) : null;
+      var col = on ? 'var(--over)' : 'var(--ok)';
+      return this._tl(I.engine, 'Engine', mil || cnt) + '<div class="num" style="color:' + col + '">' + (on ? 'On' : 'Clear') + '</div><div class="gfx">' +
+        '<div style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:14px;height:14px;border-radius:50%;background:' + col + ';box-shadow:0 0 0 4px color-mix(in srgb,' + col + ' 25%,transparent)"></span>' +
+        '<span class="mini">' + (n == null ? '' : n + ' code' + (n === 1 ? '' : 's')) + (sinceMi != null ? (n == null ? '' : ' · ') + fmt(sinceMi) + ' mi since clear' : '') + '</span></div></div>';
     }
     if (t.kind === 'trim') {
       var rs = (t.entities || []).map(this._reading, this).filter(Boolean);

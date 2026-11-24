@@ -4,6 +4,7 @@ Layout under <mount>/<folder>/:
 
     log.json                     the service log (source of truth), rewritten atomically
     settings.json                per-item Normal/Severe choice, month limits
+    stats.json                   learned: last tank reading, fill-ups, battery at rest
     backups/log-<date>.json      a snapshot taken before the first write of each day
     receipts/                    photos linked from entries (later)
 
@@ -23,6 +24,7 @@ from typing import Any, Callable
 
 LOG_FILE = "log.json"
 SETTINGS_FILE = "settings.json"
+STATS_FILE = "stats.json"
 BACKUP_DIR = "backups"
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -221,6 +223,14 @@ class GarageStore:
                     self._write(LOG_FILE, log)
                     return
         raise NotFound("That entry no longer exists.")
+
+    def stats(self) -> dict[str, Any]:
+        with self._lock:
+            return self._read(STATS_FILE, {"version": 1, "fuel_last": None, "refuels": [], "rest": []})
+
+    def save_stats(self, data: dict[str, Any]) -> None:
+        with self._lock:
+            self._write(STATS_FILE, data)
 
     def set_profile(self, n: int, profile: str) -> dict[str, Any]:
         if n not in self.valid_items:

@@ -11,7 +11,8 @@
           "fuel_entity": "Fuel level sensor (optional)",
           "tank_size": "Tank size (litres, optional)",
           "mount_path": "Share mount path",
-          "folder": "Folder on the share"
+          "folder": "Folder on the share",
+          "battery_entity": "Battery voltage sensor (optional)"
         }
       }
     },
@@ -35,7 +36,8 @@
           "fuel_entity": "Fuel level sensor (optional)",
           "tank_size": "Tank size (litres, optional)",
           "mount_path": "Share mount path",
-          "folder": "Folder on the share"
+          "folder": "Folder on the share",
+          "battery_entity": "Battery voltage sensor (optional)"
         }
       }
     },

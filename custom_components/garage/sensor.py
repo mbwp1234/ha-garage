@@ -10,7 +10,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, UnitOfLength
+from homeassistant.const import PERCENTAGE, STATE_UNAVAILABLE, STATE_UNKNOWN, UnitOfElectricPotential, UnitOfLength
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -28,6 +28,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, add: AddEnt
     rt = hass.data[DOMAIN][entry.entry_id]
     ents: list[SensorEntity] = [OdometerSensor(rt), OverdueSensor(rt), NextServiceSensor(rt)]
     ents += [ItemSensor(rt, it) for it in rt.schedule["items"]]
+    if rt.fuel_entity:
+        ents += [FuelLevelSensor(rt), EconomySensor(rt), RangeSensor(rt)]
+    if rt.battery_entity:
+        ents.append(BatteryRestSensor(rt))
     add(ents)
 
 
@@ -214,3 +218,93 @@ class NextServiceSensor(_Base):
     def extra_state_attributes(self) -> dict[str, Any]:
         nxt = self.rt.summary.get("next") or {}
         return {"item": nxt.get("name"), "n": nxt.get("n"), "miles_left": nxt.get("remaining"), "eta": nxt.get("eta")}
+
+
+class FuelLevelSensor(_Base):
+    """The tank, kept while the vehicle sleeps: the last real reading and when it was taken."""
+
+    _attr_name = "Fuel level"
+    _attr_icon = "mdi:gas-station-outline"
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, rt) -> None:
+        super().__init__(rt, "fuel_level")
+
+    @property
+    def native_value(self):
+        return self.rt.economy()["percent"]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        e = self.rt.economy()
+        return {"litres": e["litres"], "as_of": e["as_of"], "tank_l": self.rt.tank_l}
+
+
+class EconomySensor(_Base):
+    """Learned from tank-to-tank cycles of at least a quarter tank. Unknown until one completes."""
+
+    _attr_name = "Fuel economy"
+    _attr_icon = "mdi:gauge"
+    _attr_native_unit_of_measurement = "mpg"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, rt) -> None:
+        super().__init__(rt, "economy")
+
+    @property
+    def native_value(self):
+        return self.rt.economy()["mpg"]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        refs = self.rt.stats.get("refuels") or []
+        return {"segments": self.rt.economy()["segments"], "fill_ups": len(refs),
+                "last_fill_up": refs[-1] if refs else None}
+
+
+class RangeSensor(_Base):
+    _attr_name = "Range"
+    _attr_icon = "mdi:map-marker-distance"
+    _attr_device_class = SensorDeviceClass.DISTANCE
+    _attr_native_unit_of_measurement = UnitOfLength.MILES
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, rt) -> None:
+        super().__init__(rt, "range")
+
+    @property
+    def native_value(self):
+        return self.rt.economy()["range"]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        e = self.rt.economy()
+        return {"basis": e["range_basis"], "mpg_used": e["mpg"] if e["mpg"] is not None else self.rt.assumed_mpg}
+
+
+class BatteryRestSensor(_Base):
+    """The battery a few minutes after shutdown, once per drive: the trend is the point."""
+
+    _attr_name = "Battery at rest"
+    _attr_icon = "mdi:car-battery"
+    _attr_device_class = SensorDeviceClass.VOLTAGE
+    _attr_native_unit_of_measurement = UnitOfElectricPotential.VOLT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, rt) -> None:
+        super().__init__(rt, "battery_rest")
+
+    @property
+    def native_value(self):
+        rest = self.rt.stats.get("rest") or []
+        return rest[-1]["v"] if rest else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        rest = self.rt.stats.get("rest") or []
+        return {"as_of": rest[-1]["at"] if rest else None, "samples": len(rest),
+                "recent": [r["v"] for r in rest[-14:]]}

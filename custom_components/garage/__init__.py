@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -20,10 +21,11 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_BATTERY,
     CONF_FOLDER,
     CONF_FUEL,
     CONF_MOUNT,
@@ -44,6 +46,7 @@ from .const import (
     SIGNAL_UPDATED,
 )
 from .schedule import DEFAULT_ACTION, ItemStatus, compute, load_schedule, pace_per_day, summary
+from . import stats as gstats
 from .store import GarageError, GarageStore, StoreConfig
 
 _LOGGER = logging.getLogger(__name__)
@@ -73,6 +76,12 @@ class GarageRuntime:
     storage: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
     pace: float | None = None              # miles per day from the log
+    battery_entity: str | None = None
+    stats: dict[str, Any] = field(default_factory=gstats.empty)
+    stats_saved_l: float | None = None
+    stats_saved_at: float = 0.0
+    batt_last: float | None = None
+    assumed_mpg: float | None = None
     points: list[list[Any]] = field(default_factory=list)
 
     async def async_refresh(self) -> None:
@@ -91,6 +100,7 @@ class GarageRuntime:
             async_dispatcher_send(self.hass, SIGNAL_UPDATED.format(self.entry_id))
             return
         self.storage = st
+        self.assumed_mpg = settings.get("mpg") if isinstance(settings.get("mpg"), (int, float)) else None
         self.statuses = compute(self.schedule, entries, self.odometer, dt_util.now().date(),
                                 settings.get("profile", {}), settings.get("months", {}))
         self.summary = summary(self.statuses)
@@ -99,6 +109,17 @@ class GarageRuntime:
         self.points = sorted([e["date"], e["odometer"]] for e in entries
                              if e.get("odometer") is not None and e.get("date"))
         async_dispatcher_send(self.hass, SIGNAL_UPDATED.format(self.entry_id))
+
+    def economy(self) -> dict[str, Any]:
+        last = self.stats.get("fuel_last") or {}
+        e = gstats.economy(self.stats, self.tank_l, self.odometer, last.get("litres"))
+        mpg, basis = e["mpg"], "learned"
+        if mpg is None and self.assumed_mpg:
+            mpg, basis = self.assumed_mpg, "assumed"
+        litres = last.get("litres")
+        return {"mpg": e["mpg"], "segments": e["segments"], "range": gstats.range_miles(litres, mpg),
+                "range_basis": basis if mpg else None, "litres": litres, "as_of": last.get("at"),
+                "percent": round(litres / self.tank_l * 100, 1) if litres is not None and self.tank_l else None}
 
     def device_info(self) -> dict[str, Any]:
         """Join the device that owns the odometer (e.g. the OBD dongle) so the vehicle is one device."""
@@ -126,7 +147,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     tank = float(s.get(CONF_TANK) or 0) or None
     rt = GarageRuntime(hass, entry.entry_id, s.get(CONF_NAME) or entry.title, schedule, store,
                        s[CONF_ODOMETER], s.get(CONF_FUEL) or None, tank)
+    rt.battery_entity = s.get(CONF_BATTERY) or None
     runtimes(hass)[entry.entry_id] = rt
+    try:
+        rt.stats = await hass.async_add_executor_job(store.stats)
+        last = rt.stats.get("fuel_last") or {}
+        rt.stats_saved_l = last.get("litres")
+    except GarageError as err:
+        _LOGGER.warning("Garage %s: stats unreadable: %s", rt.name, err)
 
     status = await hass.async_add_executor_job(store.status)
     if not status["mounted"]:
@@ -141,6 +169,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.async_create_task(rt.async_refresh())
 
     entry.async_on_unload(async_track_time_change(hass, _midnight, hour=0, minute=5, second=0))
+    _track_learning(hass, entry, rt)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
@@ -158,6 +187,67 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+# ------------------------------------------------------------------ learning from the sensors
+
+def _num(state) -> float | None:
+    if state is None or state.state in ("unknown", "unavailable", "", None):
+        return None
+    try:
+        return float(state.state)
+    except ValueError:
+        return None
+
+
+def _track_learning(hass: HomeAssistant, entry: ConfigEntry, rt: GarageRuntime) -> None:
+    """Fill-ups from the tank sensor, the battery at rest from the voltage sensor."""
+
+    async def save(force: bool = False) -> None:
+        last = (rt.stats.get("fuel_last") or {}).get("litres")
+        now = time.monotonic()
+        moved = last is not None and (rt.stats_saved_l is None or abs(last - rt.stats_saved_l) >= 2.0)
+        if not (force or moved or now - rt.stats_saved_at > 900):
+            return
+        try:
+            await hass.async_add_executor_job(rt.store.save_stats, rt.stats)
+            rt.stats_saved_l, rt.stats_saved_at = last, now
+        except GarageError as err:
+            _LOGGER.debug("Garage %s: stats not saved: %s", rt.name, err)
+
+    @callback
+    def fuel_changed(event) -> None:
+        litres = _num(event.data.get("new_state"))
+        if litres is None:
+            if _num(event.data.get("old_state")) is not None:   # the truck went to sleep
+                hass.async_create_task(save(force=True))
+            return
+        unit = (event.data["new_state"].attributes or {}).get("unit_of_measurement")
+        if unit in ("gal", "US gal"):
+            litres *= gstats.L_PER_GAL
+        ev = gstats.on_fuel(rt.stats, litres, rt.odometer, dt_util.utcnow().isoformat(timespec="seconds"), rt.tank_l)
+        if ev:
+            _LOGGER.info("Garage %s: fill-up %.1f L -> %.1f L at %s", rt.name, ev["before"], ev["after"], ev["odometer"])
+        hass.async_create_task(save(force=bool(ev)))
+        async_dispatcher_send(hass, SIGNAL_UPDATED.format(rt.entry_id))
+
+    @callback
+    def battery_changed(event) -> None:
+        v = _num(event.data.get("new_state"))
+        if v is not None:
+            rt.batt_last = v
+            return
+        if rt.batt_last is not None and _num(event.data.get("old_state")) is not None:
+            gstats.on_battery_sleep(rt.stats, rt.batt_last, dt_util.utcnow().isoformat(timespec="seconds"))
+            rt.batt_last = None
+            hass.async_create_task(save(force=True))
+            async_dispatcher_send(hass, SIGNAL_UPDATED.format(rt.entry_id))
+
+    if rt.fuel_entity:
+        entry.async_on_unload(async_track_state_change_event(hass, [rt.fuel_entity], fuel_changed))
+    if rt.battery_entity:
+        rt.batt_last = _num(hass.states.get(rt.battery_entity))
+        entry.async_on_unload(async_track_state_change_event(hass, [rt.battery_entity], battery_changed))
 
 
 # ------------------------------------------------------------------ panel, API, services
@@ -233,6 +323,8 @@ def snapshot(rt: GarageRuntime) -> dict[str, Any]:
         "fuel_entity": rt.fuel_entity, "tank_l": rt.tank_l, "fuel": fuel,
         "schedule": rt.schedule, "summary": rt.summary,
         "pace": None if rt.pace is None else round(rt.pace, 1), "points": rt.points,
+        "economy": rt.economy(), "battery_entity": rt.battery_entity,
+        "refuels": (rt.stats.get("refuels") or [])[-12:], "rest": (rt.stats.get("rest") or [])[-40:],
         "items": [s.as_dict() for s in rt.statuses],
     }
 

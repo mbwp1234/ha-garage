@@ -12,6 +12,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_BATTERY,
     CONF_FOLDER,
     CONF_FUEL,
     CONF_MOUNT,
@@ -31,6 +32,7 @@ FOLDER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _-]{0,40}$")
 def _schema(d: dict[str, Any], schedules: dict[str, str]) -> vol.Schema:
     opts = [selector.SelectOptionDict(value=k, label=v) for k, v in schedules.items()]
     fuel = d.get(CONF_FUEL)
+    batt = d.get(CONF_BATTERY)
     return vol.Schema({
         vol.Required(CONF_NAME, default=d.get(CONF_NAME, "")): str,
         vol.Required(CONF_SCHEDULE, default=d.get(CONF_SCHEDULE, DEFAULT_SCHEDULE)):
@@ -38,6 +40,8 @@ def _schema(d: dict[str, Any], schedules: dict[str, str]) -> vol.Schema:
         vol.Required(CONF_ODOMETER, **({"default": d[CONF_ODOMETER]} if d.get(CONF_ODOMETER) else {})):
             selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
         vol.Optional(CONF_FUEL, **({"default": fuel} if fuel else {})):
+            selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+        vol.Optional(CONF_BATTERY, **({"default": batt} if batt else {})):
             selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
         vol.Optional(CONF_TANK, default=d.get(CONF_TANK, 0)):
             selector.NumberSelector(selector.NumberSelectorConfig(min=0, max=400, step=0.1, mode="box",

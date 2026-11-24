@@ -8,6 +8,7 @@ CONF_SCHEDULE = "schedule"
 CONF_ODOMETER = "odometer_entity"
 CONF_FUEL = "fuel_entity"
 CONF_TANK = "tank_size"
+CONF_BATTERY = "battery_entity"
 CONF_MOUNT = "mount_path"
 CONF_FOLDER = "folder"
 
