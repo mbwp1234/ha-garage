@@ -83,6 +83,7 @@ def main() -> None:
     ap.add_argument("odometer", type=float)
     ap.add_argument("--schedule", default="toyota_tacoma_3g")
     ap.add_argument("--tiles", help="JSON {entity_id: [value, unit, age_seconds?]} for the stat tiles")
+    ap.add_argument("--item", type=int, default=1, help="which item's sheet to shoot")
     ap.add_argument("--battery", help="the dongle supply-voltage entity (battery_entity option)")
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
@@ -131,7 +132,7 @@ def main() -> None:
             pg.close()
         pg = b.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
         errs = page_for(pg, False, True)
-        for nm, sel in [("sheet-item", "[data-act=item][data-n='1']"), ("sheet-log", "[data-act=log]"),
+        for nm, sel in [("sheet-item", f"[data-act=item][data-n='{a.item}']"), ("sheet-log", "[data-act=log]"),
                         ("sheet-map", "[data-act=poster]"), ("sheet-catchup", "[data-act=catchup]"),
                         ("sheet-edit", "[data-act=edit]")]:
             pg.evaluate("s => el.shadowRoot.querySelector(s).click()", sel)
