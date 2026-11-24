@@ -507,6 +507,11 @@ async def ws_profile(hass, connection, msg):
 async def async_export(rt: GarageRuntime, costs: bool = False, save: bool = True) -> dict[str, Any]:
     """The service record for a sale: printable HTML and a CSV, also saved under exports/."""
     hass = rt.hass
+    # Recompute first: right after a restart the statuses can still be empty, and a record
+    # with an empty status table looks like a vehicle with nothing on its schedule.
+    await rt.async_refresh()
+    if not rt.statuses:
+        raise HomeAssistantError(rt.error or "The schedule isn't loaded yet; try again in a moment.")
 
     def work():
         entries = rt.store.entries() if rt.store.status()["has_log"] else []
