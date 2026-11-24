@@ -249,6 +249,8 @@ def _track_learning(hass: HomeAssistant, entry: ConfigEntry, rt: GarageRuntime) 
             if litres is not None:
                 gstats.on_fuel(rt.stats, litres, rt.odometer, dt_util.utcnow().isoformat(timespec="seconds"), rt.tank_l)
                 hass.async_create_task(save(force=True))
+                # The sensors have already published by now; tell them the tank is known.
+                async_dispatcher_send(hass, SIGNAL_UPDATED.format(rt.entry_id))
         entry.async_on_unload(async_track_state_change_event(hass, [rt.fuel_entity], fuel_changed))
     if rt.battery_entity:
         rt.batt_last = _num(hass.states.get(rt.battery_entity))
