@@ -79,10 +79,11 @@ class OdometerSensor(_Base, RestoreSensor):
                     self.rt.odometer_as_of = last_state.attributes.get("as_of")
             except (TypeError, ValueError):
                 pass
-        self.async_on_remove(async_track_state_change_event(self.hass, [self.rt.odometer_entity], self._source))
-        src = self.hass.states.get(self.rt.odometer_entity)
-        if src is not None:
-            self._accept(src)
+        if self.rt.odometer_entity:
+            self.async_on_remove(async_track_state_change_event(self.hass, [self.rt.odometer_entity], self._source))
+            src = self.hass.states.get(self.rt.odometer_entity)
+            if src is not None:
+                self._accept(src)
         self._attr_native_value = self.rt.odometer
 
     @callback
@@ -133,7 +134,7 @@ class OdometerSensor(_Base, RestoreSensor):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        return {"as_of": self.rt.odometer_as_of, "source": self.rt.odometer_entity}
+        return {"as_of": self.rt.odometer_as_of, "source": self.rt.odometer_entity or "typed"}
 
 
 class ItemSensor(_Base):

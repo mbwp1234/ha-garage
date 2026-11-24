@@ -37,7 +37,8 @@ def _schema(d: dict[str, Any], schedules: dict[str, str]) -> vol.Schema:
         vol.Required(CONF_NAME, default=d.get(CONF_NAME, "")): str,
         vol.Required(CONF_SCHEDULE, default=d.get(CONF_SCHEDULE, DEFAULT_SCHEDULE)):
             selector.SelectSelector(selector.SelectSelectorConfig(options=opts)),
-        vol.Required(CONF_ODOMETER, **({"default": d[CONF_ODOMETER]} if d.get(CONF_ODOMETER) else {})):
+        # Optional: a vehicle without an OBD dongle yet runs on mileage typed into the panel.
+        vol.Optional(CONF_ODOMETER, **({"default": d[CONF_ODOMETER]} if d.get(CONF_ODOMETER) else {})):
             selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
         vol.Optional(CONF_FUEL, **({"default": fuel} if fuel else {})):
             selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),

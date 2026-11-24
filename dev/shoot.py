@@ -28,7 +28,8 @@ def _load(name):
     return mod
 
 
-def fixture(folder: Path, odometer: float, schedule_id: str, states: dict, battery: str | None = None) -> dict:
+def fixture(folder: Path, odometer: float | None, schedule_id: str, states: dict, battery: str | None = None,
+            name: str | None = None, typed: bool = False, others: list | None = None) -> dict:
     sched = _load("schedule")
     s = sched.load_schedule(schedule_id)
     log = json.loads((folder / "log.json").read_text())["entries"] if (folder / "log.json").exists() else []
@@ -44,10 +45,10 @@ def fixture(folder: Path, odometer: float, schedule_id: str, states: dict, batte
     eco = gst.economy(stats, 79.9, odometer, last.get("litres"))
     mpg = eco["mpg"] or settings.get("mpg")
     vehicle = {
-        "entry_id": "dev", "name": "Tacoma" if "taco" in folder.name.lower() else "Example", "error": None,
+        "entry_id": "dev", "name": name or ("Tacoma" if "taco" in folder.name.lower() else "Example"), "error": None,
         "storage": {"mounted": True, "exists": True, "has_log": True}, "odometer": odometer,
-        "odometer_as_of": "2026-01-01T00:00:00+00:00", "odometer_entity": "sensor.dev_odometer",
-        "fuel_entity": "sensor.dev_fuel", "tank_l": 79.9,
+        "odometer_as_of": "2026-01-01T00:00:00+00:00", "odometer_entity": None if typed else "sensor.dev_odometer",
+        "fuel_entity": None if typed else "sensor.dev_fuel", "tank_l": 79.9,
         "fuel": None, "schedule": s, "summary": sched.summary(st), "pace": None if pace is None else round(pace, 1),
         "points": sorted([e["date"], e["odometer"]] for e in log if e.get("odometer") is not None),
         "items": [x.as_dict() for x in st],
@@ -56,7 +57,10 @@ def fixture(folder: Path, odometer: float, schedule_id: str, states: dict, batte
                     "as_of": last.get("at"), "percent": None},
         "refuels": stats.get("refuels", [])[-12:], "rest": stats.get("rest", [])[-40:], "battery_entity": battery,
     }
-    return {"vehicles": [{"entry_id": "dev", "name": vehicle["name"]}], "vehicle": vehicle, "log": log,
+    me = {"entry_id": "dev", "name": vehicle["name"], "summary": vehicle["summary"]}
+    vs = [me] + [{"entry_id": f"other{i}", "name": o[0], "summary": {"over": o[1], "soon": o[2], "nolog": o[3]}}
+                 for i, o in enumerate(others or [])]
+    return {"vehicles": vs, "vehicle": vehicle, "log": log,
             "settings": settings, "states": states}
 
 
@@ -80,7 +84,10 @@ customElements.whenDefined('__TAG__').then(function(){
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("folder")
-    ap.add_argument("odometer", type=float)
+    ap.add_argument("odometer", help="miles, or 'none' for no reading")
+    ap.add_argument("--name")
+    ap.add_argument("--typed", action="store_true", help="no odometer sensor: mileage is typed in")
+    ap.add_argument("--other", action="append", default=[], help="another vehicle for the tabs: Name:over:soon:nolog")
     ap.add_argument("--schedule", default="toyota_tacoma_3g")
     ap.add_argument("--tiles", help="JSON {entity_id: [value, unit, age_seconds?]} for the stat tiles")
     ap.add_argument("--item", type=int, default=1, help="which item's sheet to shoot")
@@ -90,11 +97,13 @@ def main() -> None:
 
     folder = Path(a.folder)
     states = json.loads(Path(a.tiles).read_text()) if a.tiles else {}
-    fix = fixture(folder, a.odometer, a.schedule, states, a.battery)
+    odo = None if a.odometer.lower() == "none" else float(a.odometer)
+    others = [[o.split(":")[0]] + [int(x) for x in o.split(":")[1:4]] for o in a.other]
+    fix = fixture(folder, odo, a.schedule, states, a.battery, a.name, a.typed, others)
     panel = (COMP / "frontend" / "garage-panel.js").read_text()
     ver = panel.split("var VERSION = '")[1].split("'")[0]
     tag = "garage-panel-" + ver.replace(".", "-")
-    img = next((folder / n for n in ("truck.png", "truck.jpg", "vehicle.png") if (folder / n).exists()), None)
+    img = next((folder / n for n in ("truck.png", "truck.jpg", "vehicle.png", "vehicle.jpg") if (folder / n).exists()), None)
     OUT.mkdir(parents=True, exist_ok=True)
 
     def page_for(pw_page, dark, narrow):
@@ -134,10 +143,12 @@ def main() -> None:
         errs = page_for(pg, False, True)
         for nm, sel in [("sheet-item", f"[data-act=item][data-n='{a.item}']"), ("sheet-log", "[data-act=log]"),
                         ("sheet-map", "[data-act=poster]"), ("sheet-catchup", "[data-act=catchup]"),
-                        ("sheet-edit", "[data-act=edit]")]:
+                        ("sheet-edit", "[data-act=edit]"), ("sheet-odo", "[data-act=odo]")]:
             if nm == "sheet-item":  # any item, even one the list has folded away
                 pg.evaluate("n => el._open({ kind: 'item', n: n })", a.item)
             else:
+                if not pg.evaluate("s => !!el.shadowRoot.querySelector(s)", sel):
+                    continue
                 pg.evaluate("s => el.shadowRoot.querySelector(s).click()", sel)
             pg.wait_for_timeout(500)
             pg.screenshot(path=str(OUT / f"{nm}.png"))

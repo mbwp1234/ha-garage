@@ -171,7 +171,9 @@ def compute(schedule: dict[str, Any], entries: list[dict[str, Any]], odometer: f
         interval = effective_interval(item, profile)
         hist = entries_for(entries, n, item["kind"])
         last = hist[-1] if hist else None
-        mo = months.get(str(n))
+        # A month limit set in settings wins; otherwise the schedule's own ("8,000 mi or 12 mo"),
+        # the severe one when the item runs severe. Tacoma items carry none: miles only, as on the map.
+        mo = months.get(str(n)) or (item.get("severe_months") if profile == "severe" else None) or item.get("months")
         st = ItemStatus(n=n, id=item["id"], name=item["name"], short=item["short"], kind=item["kind"],
                         zone=item.get("zone", ""), profile=profile, interval=interval,
                         status="ok", remaining=None, due_at=None, months=int(mo) if mo else None,

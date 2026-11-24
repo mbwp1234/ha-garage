@@ -11,18 +11,18 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.6.1';
+var VERSION = '0.7.0';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
 var CSS = [
 ':host{--ground:#F1F4F8;--card:#FFFFFF;--card2:#F3F5F9;--track:#E5E9F0;--edge:rgba(16,24,40,.06);--ink:#101623;--ink2:#4B5667;--ink3:#626C7C;',
 '  --cav:#46617E;--over:#C2410C;--soon:#F59F00;--soonink:#9A5800;--ok:#2B8A3E;--hatch:rgba(98,108,124,.30);--scrim:rgba(10,14,22,.32);',
-'  --shadow:0 1px 2px rgba(16,24,40,.04),0 12px 32px -16px rgba(16,24,40,.16);',
+'  --shadow:0 1px 2px rgba(16,24,40,.04),0 12px 32px -16px rgba(16,24,40,.16);--imgbg:#E8EDF3;',
 '  display:block;position:relative;height:calc(100dvh - var(--g-top,0px));overflow:hidden;background:var(--ground);color:var(--ink);',
 '  font-family:Geist,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:13px;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;color-scheme:light}',
 ':host([dark]){--ground:#0A0E18;--card:#131925;--card2:#1A2130;--track:#242C3B;--edge:rgba(255,255,255,.06);--ink:#EDF1F7;--ink2:#AEB7C6;--ink3:#8F99AA;',
-'  --cav:#8EA9C6;--over:#FF8A5B;--soon:#FFC048;--soonink:#FFC048;--ok:#51CF66;--hatch:rgba(143,153,170,.32);--scrim:rgba(0,0,0,.55);--shadow:0 0 0 1px rgba(255,255,255,.02);color-scheme:dark}',
+'  --cav:#8EA9C6;--over:#FF8A5B;--soon:#FFC048;--soonink:#FFC048;--ok:#51CF66;--hatch:rgba(143,153,170,.32);--scrim:rgba(0,0,0,.55);--shadow:0 0 0 1px rgba(255,255,255,.02);--imgbg:#0B0F16;color-scheme:dark}',
 '*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}',
 'button,input,select,textarea{font:inherit;color:inherit}',
 'button{border:0;background:none;padding:0;cursor:pointer}',
@@ -36,6 +36,19 @@ var CSS = [
 '.top{display:flex;align-items:center;gap:6px;height:58px}',
 '.iconbtn{width:44px;height:44px;border-radius:22px;display:grid;place-items:center;color:var(--ink2)}',
 '.title{padding:2px 4px 18px}',
+'.vtabs{flex:1;display:flex;gap:8px;min-width:0}',
+'.vtab{flex:1;min-width:0;height:44px;border-radius:22px;background:var(--card);border:1px solid var(--edge);font-size:14px;font-weight:650;color:var(--ink2);display:flex;align-items:center;justify-content:center;gap:8px}',
+'.vtab[aria-selected=true]{background:var(--ink);border-color:var(--ink);color:var(--ground)}',
+'.vb{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--over);color:#fff;font-size:11.5px;font-weight:700;display:grid;place-items:center}',
+'.vb.soon{background:var(--soon);color:#2B1600}',
+'.vb.nolog{min-width:9px;width:9px;height:9px;padding:0;background:repeating-linear-gradient(45deg,var(--ink3) 0 2px,transparent 2px 4px);box-shadow:0 0 0 1px var(--ink3)}',
+'.odobtn{position:relative;height:30px;padding:0 12px;margin-left:4px;border-radius:15px;background:var(--cav);color:#fff;font-size:12.5px;font-weight:650}',
+':host([dark]) .odobtn{color:#0A0E18}',
+'.odobtn::after{content:"";position:absolute;inset:-7px -4px}',
+'.odoin{display:flex;align-items:baseline;gap:8px;height:76px;padding:0 18px;border-radius:20px;background:var(--card2);border:2px solid var(--cav);margin:6px 0 8px}',
+'.odoin input{flex:1;min-width:0;height:72px;border:0;background:none;font-size:40px;font-weight:250;letter-spacing:-.03em;outline:none}',
+'.odoin span{font-size:16px;font-weight:600;color:var(--ink3)}',
+'.odonote{font-size:12.5px;font-weight:500;color:var(--ink2);margin:0 2px 16px}',
 '.title h1{margin:0;font-size:34px;font-weight:650;letter-spacing:-.03em}',
 '.odo{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:15px;font-weight:500;color:var(--ink2)}',
 '.live{width:8px;height:8px;border-radius:50%;background:var(--ok)}',
@@ -49,9 +62,10 @@ var CSS = [
 'button.chip{cursor:pointer}',
 /* hero */
 '.hero{padding:0;overflow:hidden}',
-'.garage{position:relative;aspect-ratio:3/2;background:#0B0F16}',
+/* The pictures are transparent; the tile behind them follows the theme, never a fixed dark box. */
+'.garage{position:relative;aspect-ratio:3/2;background:var(--imgbg)}',
 '.garage img{display:block;width:100%;height:100%;object-fit:cover}',
-'.garage .noimg{position:absolute;inset:0;display:grid;place-items:center;color:#5B6676}',
+'.garage .noimg{position:absolute;inset:0;display:grid;place-items:center;color:var(--ink3)}',
 '.hs{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;display:grid;place-items:center;border-radius:50%}',
 '.hs i{position:relative;width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;background:var(--c)}',
 '.hs.over i{--c:var(--over);box-shadow:0 0 0 4px color-mix(in srgb,var(--over) 30%,transparent);animation:pulse 2.2s ease-out infinite}',
@@ -306,6 +320,9 @@ class GaragePanel extends HTMLElement {
     this._showAll = false;
     this._armed = null;
     this._err = '';
+    /* Which vehicle: ?vehicle=<name or id> wins (the dashboard links that way), then the last one picked. */
+    this._entry = null;
+    try { this._entry = new URLSearchParams(location.search).get('vehicle') || localStorage.getItem('garage.vehicle'); } catch (e) { this._entry = null; }
   }
 
   set hass(h) {
@@ -362,10 +379,15 @@ class GaragePanel extends HTMLElement {
 
   async _load() {
     try {
-      var entry = this._data && this._data.vehicle ? this._data.vehicle.entry_id : undefined;
+      var entry = this._entry || (this._data && this._data.vehicle ? this._data.vehicle.entry_id : undefined);
       var msg = { type: 'garage/get' };
       if (entry) msg.entry_id = entry;
-      var d = await this._hass.callWS(msg);
+      var d;
+      try { d = await this._hass.callWS(msg); } catch (e) {
+        if (!entry) throw e;
+        this._entry = null;                       // a remembered vehicle that is gone: fall back to the first
+        d = await this._hass.callWS({ type: 'garage/get' });
+      }
       this._data = d;
       this._err = '';
     } catch (e) {
@@ -380,10 +402,13 @@ class GaragePanel extends HTMLElement {
     var v = this._data && this._data.vehicle;
     if (!v || this._imgFor === v.entry_id) return;
     this._imgFor = v.entry_id;
+    this._img = null;
     try {
       var r = await this._hass.fetchWithAuth('/api/garage/' + v.entry_id + '/image');
-      if (!r.ok) return;
-      this._img = URL.createObjectURL(await r.blob());
+      if (!r.ok || this._imgFor !== v.entry_id) { this._render(); return; }
+      var url = URL.createObjectURL(await r.blob());
+      if (this._imgFor !== v.entry_id) return;   // switched vehicles while it loaded
+      this._img = url;
       this._render();
     } catch (e) { /* no picture is fine */ }
   }
@@ -453,7 +478,7 @@ class GaragePanel extends HTMLElement {
   _render() {
     if (!this._root) return;
     var d = this._data;
-    var head = '<div class="top">' + (this._narrow ? '<button class="iconbtn" data-act="menu" aria-label="Menu">' + I.menu + '</button>' : '') + '</div>';
+    var head = '<div class="top">' + (this._narrow ? '<button class="iconbtn" data-act="menu" aria-label="Menu">' + I.menu + '</button>' : '') + this._tabs(d) + '</div>';
     if (!d) {
       this._root.innerHTML = head + (this._err ? '<div class="banner">' + esc(this._err) + '</div>' : '');
       return;
@@ -467,9 +492,16 @@ class GaragePanel extends HTMLElement {
     var live = this._running();
     var asOf = src && num(src) !== null ? src.last_updated : v.odometer_as_of;
     var html = head;
-    html += '<div class="title"><h1>' + esc(v.name) + '</h1><div class="odo">' + I.odo + (v.odometer == null ? 'No odometer reading yet' : fmt(v.odometer) + ' mi') +
-      '<span class="live' + (live ? '' : ' off') + '" title="' + (live ? 'Running' : 'Parked') + '"></span>' +
-      (!live && asOf ? '<span class="mini">parked ' + esc(ago(asOf)) + '</span>' : '') + '</div></div>';
+    if (v.odometer_entity) {
+      html += '<div class="title"><h1>' + esc(v.name) + '</h1><div class="odo">' + I.odo + (v.odometer == null ? 'No odometer reading yet' : fmt(v.odometer) + ' mi') +
+        '<span class="live' + (live ? '' : ' off') + '" title="' + (live ? 'Running' : 'Parked') + '"></span>' +
+        (!live && asOf ? '<span class="mini">parked ' + esc(ago(asOf)) + '</span>' : '') + '</div></div>';
+    } else {
+      /* No sensor: the mileage is whatever was last typed in (or logged), dated, never a guess. */
+      html += '<div class="title"><h1>' + esc(v.name) + '</h1><div class="odo">' + I.odo + (v.odometer == null ? 'No mileage yet' : fmt(v.odometer) + ' mi') +
+        (v.odometer != null && v.odometer_as_of ? '<span class="mini">as of ' + esc(dmonth(String(v.odometer_as_of).slice(0, 10))) + '</span>' : '') +
+        '<button class="odobtn" data-act="odo">' + (v.odometer == null ? 'Add mileage' : 'Update') + '</button></div></div>';
+    }
     if (this._err) html += '<div class="banner">' + esc(this._err) + '</div>';
     if (v.error) html += '<div class="banner">' + esc(v.error) + '</div>';
     else if (v.storage && v.storage.mounted === false) html += '<div class="banner">The garage folder isn\'t mounted, so nothing can be logged right now.</div>';
@@ -481,6 +513,19 @@ class GaragePanel extends HTMLElement {
     this._paintTiles();
     this._layoutPills();
     if (this._sheet && (this._sheet.kind === 'item' || this._sheet.kind === 'poster')) this._renderSheet(true);
+  }
+
+  /* One tab per vehicle, only when there is more than one. The badge is that vehicle's worst news:
+     a count overdue, a count due soon, or a hatched dot for "never logged". */
+  _tabs(d) {
+    var vs = d.vehicles || [];
+    if (vs.length < 2) return '';
+    var cur = d.vehicle && d.vehicle.entry_id;
+    return '<div class="vtabs" role="tablist" aria-label="Vehicle">' + vs.map(function (x) {
+      var s = x.summary || {};
+      var b = s.over ? '<span class="vb">' + s.over + '</span>' : s.soon ? '<span class="vb soon">' + s.soon + '</span>' : s.nolog ? '<span class="vb nolog" aria-hidden="true"></span>' : '';
+      return '<button class="vtab" role="tab" data-act="veh" data-id="' + esc(x.entry_id) + '" aria-selected="' + (x.entry_id === cur) + '">' + esc(x.name) + b + '</button>';
+    }).join('') + '</div>';
   }
 
   _items() { return (this._data.vehicle.items || []).slice(); }
@@ -513,6 +558,7 @@ class GaragePanel extends HTMLElement {
     var pair = function (n, l, c, minor) { return '<span class="bn' + (minor ? ' minor' : '') + '"><span class="n ' + c + '">' + esc(n) + '</span><span class="l">' + esc(l) + '</span></span>'; };
     var byRank = function (a, b) { return RANK[a.status] - RANK[b.status] || (a.remaining == null ? 0 : a.remaining) - (b.remaining == null ? 0 : b.remaining); };
     var big, chips;
+    var fresh0 = !s.over && !s.soon && s.nolog > 0 && !((this._data && this._data.log) || []).length;
     if (sel && zones[sel]) {
       var its = items.filter(function (i) { return i.zone === sel; }).sort(byRank);
       var due = its.filter(function (i) { return i.status !== 'ok'; });
@@ -521,6 +567,11 @@ class GaragePanel extends HTMLElement {
     } else if (s.over || s.soon) {
       big = (s.over ? pair(s.over, 'overdue', 'c-over') : '') + (s.soon ? pair(s.soon, 'soon', 'c-soon', !!s.over) : '');
       chips = items.filter(function (i) { return i.status === 'over' || i.status === 'soon'; }).sort(byRank);
+    } else if (fresh0) {
+      /* Nothing has a record yet (a new vehicle): not "all good", and not "6,750 mi to Plugs"
+         either, which only means plugs are the first item whose due point is known. */
+      big = pair(s.nolog, 'never logged', 'c-nolog');
+      chips = [];
     } else {
       big = pair(s.next ? fmt(s.next.remaining) : '—', s.next ? 'mi to ' + s.next.short : 'all good', 'c-ok');
       chips = [];
@@ -532,7 +583,9 @@ class GaragePanel extends HTMLElement {
     return '<section class="card hero"><div class="garage">' + pic + spots + pills + '</div><div class="herobody">' +
       '<div class="bignum">' + big + '</div>' +
       (chipHtml ? '<div class="chips">' + chipHtml + '</div>' : '') +
-      '<button class="pri" data-act="log">' + I.plus + 'Log service</button></div></section>';
+      (!sel && fresh0
+        ? '<div class="btns" style="grid-template-columns:1fr 1fr"><button class="pri" data-act="catchup">Catch up</button><button class="sec" data-act="log">' + I.plus + 'Log service</button></div>'
+        : '<button class="pri" data-act="log">' + I.plus + 'Log service</button>') + '</div></section>';
   }
 
   /* Labels go where they cover neither a dot nor another label: above, below, then beside. */
@@ -839,7 +892,7 @@ class GaragePanel extends HTMLElement {
       var a = s.ans[n] || {};
       var done = a.mode === 'done';
       var h = '<div class="cu"><div class="cuh"><span class="nb ' + (done ? 'sel' : 'nolog') + '">' + n + '</span><span class="cut"><b>' + esc(it.name || it.short) + '</b><span>' +
-        esc((KW[it.kind] || 'change') + (st.interval ? ' every ' + k(st.interval) : '')) + '</span></span>' +
+        esc((KW[it.kind] || 'change') + (st.interval ? ' every ' + k(st.interval) : '') + (st.months ? ' or ' + st.months + ' mo' : '')) + '</span></span>' +
         '<div class="seg sm" role="group" aria-label="' + esc(it.short) + '"><button data-act="cu" data-n="' + n + '" data-m="done" aria-pressed="' + done + '">Done</button>' +
         '<button data-act="cu" data-n="' + n + '" data-m="unsure" aria-pressed="' + (a.mode === 'unsure') + '">Not sure</button></div></div>';
       if (done) {
@@ -930,7 +983,7 @@ class GaragePanel extends HTMLElement {
   _renderSheet(keep) {
     var s = this._sheet;
     if (!s || !this._data || !this._data.vehicle) return;
-    var body = s.kind === 'item' ? this._itemSheet(s.n) : s.kind === 'poster' ? this._posterSheet() : s.kind === 'catchup' ? this._catchSheet(s) : this._logSheet(s);
+    var body = s.kind === 'item' ? this._itemSheet(s.n) : s.kind === 'poster' ? this._posterSheet() : s.kind === 'catchup' ? this._catchSheet(s) : s.kind === 'odo' ? this._odoSheet() : this._logSheet(s);
     var inner = this._sw.querySelector('.sheet .in');
     if (keep && inner) { var y = inner.scrollTop; inner.innerHTML = body; inner.scrollTop = y; return; }
     this._sw.innerHTML = '<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true"><div class="in">' + body + '</div></div>';
@@ -958,7 +1011,7 @@ class GaragePanel extends HTMLElement {
     var html = this._sheetHead(sc.name, '<span class="nb ' + st.status + '">' + n + '</span>');
     html += '<div class="bignum"><span class="n ' + cls + '">' + big + '</span><span class="l">' + unit + '</span></div>';
     var VERB = { change: 'Change', inspect: 'Inspect', rotate: 'Rotate', grease: 'Grease' };
-    var facts = ['<span class="spec">' + (VERB[sc.kind] || 'Every') + (VERB[sc.kind] ? ' every' : '') + ' <b>' + k(st.interval) + '</b>' + (sc.first ? ' · first at <b>' + k(sc.first) + '</b>' : '') + '</span>'];
+    var facts = ['<span class="spec">' + (VERB[sc.kind] || 'Every') + (VERB[sc.kind] ? ' every' : '') + ' <b>' + k(st.interval) + '</b>' + (st.months ? ' or <b>' + st.months + ' mo</b>' : '') + (sc.first ? ' · first at <b>' + k(sc.first) + '</b>' : '') + '</span>'];
     if (st.last_odometer != null) facts.push('<span class="spec">Last <b>' + fmt(st.last_odometer) + '</b> · ' + esc(dshort(st.last_date)) + '</span>');
     if (st.due_at != null) facts.push('<span class="spec">Due <b>' + fmt(st.due_at) + '</b>' + (st.eta ? ' · ≈ ' + esc(dmonth(st.eta)) : '') + '</span>');
     html += '<div class="facts">' + facts.join('') + '</div>';
@@ -996,6 +1049,17 @@ class GaragePanel extends HTMLElement {
     return '<div class="chart" role="img" aria-label="Miles between services"><div class="bars">' + bars.join('') + '</div>' +
       '<div class="line" style="bottom:' + (20 + st.interval / max * H).toFixed(0) + 'px"><b>' + k(st.interval) + '</b></div>' +
       '<div class="chartx"><span>' + esc(first.slice(0, 4)) + '</span><span>now</span></div></div>';
+  }
+
+  _odoSheet() {
+    var v = this._data.vehicle;
+    var html = this._sheetHead(v.name + ' mileage');
+    html += '<label class="eyebrow" for="g-odonow">Odometer now</label><div class="odoin"><input id="g-odonow" inputmode="numeric" autocomplete="off" placeholder="' +
+      (v.odometer == null ? 'miles' : fmt(v.odometer)) + '"><span>mi</span></div>';
+    html += '<p class="odonote">Read it off the dash. It is dated today, and the schedule counts from it until an odometer sensor takes over.' +
+      (v.odometer != null ? ' Last: ' + esc(fmt(v.odometer)) + ' mi' + (v.odometer_as_of ? ', ' + esc(dshort(String(v.odometer_as_of).slice(0, 10))) : '') + '.' : '') + '</p>';
+    html += '<div class="err" role="alert" hidden></div><div class="btns"><button class="pri" data-act="odosave">' + I.check + 'Save mileage</button></div>';
+    return html;
   }
 
   _logSheet(s) {
@@ -1082,6 +1146,24 @@ class GaragePanel extends HTMLElement {
     var a = el.dataset.act, n = el.dataset.n ? +el.dataset.n : null;
     if (a !== 'del') this._armed = null;
     if (a === 'menu') { this.dispatchEvent(new Event('hass-toggle-menu', { bubbles: true, composed: true })); return; }
+    if (a === 'veh') {
+      var id = el.dataset.id;
+      if (this._data && this._data.vehicle && this._data.vehicle.entry_id === id) return;
+      this._entry = id;
+      try { localStorage.setItem('garage.vehicle', id); } catch (e2) { /* per-device nicety only */ }
+      this._zone = null; this._showAll = false; this._showGood = false; this._stop = null;
+      if (this._sheet) this._close();
+      this._load();
+      return;
+    }
+    if (a === 'odo') { this._open({ kind: 'odo' }); var self3 = this; requestAnimationFrame(function () { var i = self3.shadowRoot.getElementById('g-odonow'); if (i) i.focus(); }); return; }
+    if (a === 'odosave') {
+      var raw = (this.shadowRoot.getElementById('g-odonow') || {}).value || '';
+      var miles = parseFloat(String(raw).replace(/,/g, ''));
+      if (!(miles > 0)) { this._sheetError('Type the miles on the dash.'); return; }
+      this._write({ type: 'garage/set_odometer', miles: miles }, 'Mileage saved');
+      return;
+    }
     if (a === 'zone') { this._zone = this._zone === el.dataset.z ? null : el.dataset.z; this._render(); return; }
     if (a === 'item') { this._open({ kind: 'item', n: n }); return; }
     if (a === 'poster') { this._open({ kind: 'poster' }); return; }
@@ -1276,7 +1358,7 @@ class GaragePanel extends HTMLElement {
       if (keepSheet) this._renderSheet(true);
       else { this._close(); if (toast) this._toast(toast); }
     } catch (e) {
-      if (this._sheet && this._sheet.kind === 'log') this._sheetError((e && e.message) || 'Could not save.');
+      if (this._sheet && (this._sheet.kind === 'log' || this._sheet.kind === 'odo')) this._sheetError((e && e.message) || 'Could not save.');
       else this._toast((e && e.message) || 'Could not save.');
     }
   }

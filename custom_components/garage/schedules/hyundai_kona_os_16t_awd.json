@@ -1,0 +1,233 @@
+{
+  "id": "hyundai_kona_os_16t_awd",
+  "title": "Hyundai Kona 1.6T AWD (2022–23)",
+  "source": "Transcribed from the 2022 Hyundai Kona owner's manual (US), Normal Maintenance Schedule and Maintenance Under Severe Usage Conditions, Smartstream G1.6 T-GDi with dual-clutch transmission: https://ownersmanual.hyundai.com/full_pdf/OS/2022/en_US",
+  "unit": "mi",
+  "severe_when": "Short trips under 5 miles, long idling, dusty or salted roads, very cold weather, heavy traffic, mountain roads, towing, or hard acceleration.",
+  "notes": [
+    "After 10 years or 100,000 miles, Hyundai says to use the severe schedule.",
+    "Whichever comes first: miles or months."
+  ],
+  "zones": {
+    "engine": "Engine",
+    "cabin": "Cabin",
+    "front": "Wheels & brakes",
+    "trans": "Transmission",
+    "rear": "Rear axle"
+  },
+  "items": [
+    {
+      "n": 1,
+      "id": "oil",
+      "name": "Engine oil & filter",
+      "short": "Oil",
+      "kind": "change",
+      "zone": "engine",
+      "normal": 8000,
+      "severe": 5000,
+      "months": 12,
+      "severe_months": 6,
+      "spec": [
+        "0W-20 full synthetic, API SP (SN PLUS) / ILSAC GF-6",
+        "4.8 L (1.27 US gal) drain and refill"
+      ],
+      "notes": [
+        "Lower-grade or non-synthetic oil puts it on the severe interval."
+      ],
+      "parts": [],
+      "torque": []
+    },
+    {
+      "n": 2,
+      "id": "rotate",
+      "name": "Tire rotation",
+      "short": "Rotate",
+      "kind": "rotate",
+      "zone": "front",
+      "normal": 8000,
+      "months": 12,
+      "spec": [
+        "Cold pressure 33 psi front and rear",
+        "Wheel bolts 79–94 lb·ft"
+      ],
+      "parts": [],
+      "torque": [],
+      "notes": []
+    },
+    {
+      "n": 3,
+      "id": "pads",
+      "name": "Brake pad check",
+      "short": "Pad check",
+      "kind": "inspect",
+      "zone": "front",
+      "normal": 8000,
+      "months": 12,
+      "notes": [
+        "Disc brakes and pads: inspect and replace as needed."
+      ],
+      "spec": [],
+      "parts": [],
+      "torque": []
+    },
+    {
+      "n": 4,
+      "id": "cabin",
+      "name": "Cabin air filter",
+      "short": "Cabin",
+      "kind": "change",
+      "zone": "cabin",
+      "normal": 16000,
+      "months": 24,
+      "spec": [],
+      "parts": [],
+      "torque": [],
+      "notes": []
+    },
+    {
+      "n": 5,
+      "id": "air",
+      "name": "Engine air filter",
+      "short": "Air filter",
+      "kind": "change",
+      "zone": "engine",
+      "normal": 24000,
+      "months": 36,
+      "notes": [
+        "Replace more often on dusty or unpaved roads."
+      ],
+      "spec": [],
+      "parts": [],
+      "torque": []
+    },
+    {
+      "n": 6,
+      "id": "dct",
+      "name": "Dual-clutch transmission fluid check",
+      "short": "DCT check",
+      "kind": "inspect",
+      "zone": "trans",
+      "normal": 40000,
+      "months": 48,
+      "spec": [
+        "DCT fluid API GL-4, SAE 70W",
+        "1.6–1.7 L"
+      ],
+      "notes": [
+        "Severe use: replace every 80,000 mi.",
+        "Change it if the transmission has been under water."
+      ],
+      "parts": [],
+      "torque": []
+    },
+    {
+      "n": 7,
+      "id": "plugs",
+      "name": "Spark plugs",
+      "short": "Plugs",
+      "kind": "change",
+      "zone": "engine",
+      "normal": 48000,
+      "notes": [
+        "Replace more often under severe use."
+      ],
+      "spec": [],
+      "parts": [],
+      "torque": []
+    },
+    {
+      "n": 8,
+      "id": "brakefluid",
+      "name": "Brake fluid",
+      "short": "Brake fluid",
+      "kind": "change",
+      "zone": "front",
+      "normal": 48000,
+      "months": 48,
+      "spec": [
+        "DOT-4 LV",
+        "0.7–0.8 L"
+      ],
+      "parts": [],
+      "torque": [],
+      "notes": []
+    },
+    {
+      "n": 9,
+      "id": "belt",
+      "name": "Drive belt check",
+      "short": "Belt check",
+      "kind": "inspect",
+      "zone": "engine",
+      "normal": 8000,
+      "first": 48000,
+      "months": 12,
+      "notes": [
+        "First check at 48,000 mi or 6 years, then every 8,000 mi or 12 months."
+      ],
+      "spec": [],
+      "parts": [],
+      "torque": []
+    },
+    {
+      "n": 10,
+      "id": "coolant",
+      "name": "Coolant",
+      "short": "Coolant",
+      "kind": "change",
+      "zone": "engine",
+      "normal": 24000,
+      "first": 120000,
+      "months": 24,
+      "spec": [
+        "Ethylene glycol, phosphate-based (for aluminum radiators)",
+        "6.9 L"
+      ],
+      "notes": [
+        "First change at 120,000 mi or 10 years, then every 24,000 mi or 2 years."
+      ],
+      "parts": [],
+      "torque": []
+    },
+    {
+      "n": 11,
+      "id": "tcase",
+      "name": "Transfer case oil check",
+      "short": "T-case check",
+      "kind": "inspect",
+      "zone": "trans",
+      "normal": 32000,
+      "spec": [
+        "Hypoid gear oil API GL-5, SAE 75W-85",
+        "0.47–0.52 L"
+      ],
+      "notes": [
+        "AWD only.",
+        "Severe use: replace every 72,000 mi.",
+        "Change it if it has been under water."
+      ],
+      "parts": [],
+      "torque": []
+    },
+    {
+      "n": 12,
+      "id": "rdiff",
+      "name": "Rear differential oil check",
+      "short": "Diff check",
+      "kind": "inspect",
+      "zone": "rear",
+      "normal": 32000,
+      "spec": [
+        "Hypoid gear oil API GL-5, SAE 75W-90",
+        "0.47–0.52 L"
+      ],
+      "notes": [
+        "AWD only.",
+        "Severe use: replace every 72,000 mi.",
+        "Change it if it has been under water."
+      ],
+      "parts": [],
+      "torque": []
+    }
+  ]
+}

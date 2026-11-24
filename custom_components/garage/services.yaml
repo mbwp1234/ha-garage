@@ -56,3 +56,16 @@ export_record:
       default: false
       selector:
         boolean:
+set_odometer:
+  fields:
+    vehicle:
+      selector:
+        text:
+    miles:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 2000000
+          mode: box
+          unit_of_measurement: mi
