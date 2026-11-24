@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.5.0';
+var VERSION = '0.5.1';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
@@ -952,7 +952,8 @@ class GaragePanel extends HTMLElement {
     else { big = fmt(st.remaining); unit = 'mi to go'; }
     var html = this._sheetHead(sc.name, '<span class="nb ' + st.status + '">' + n + '</span>');
     html += '<div class="bignum"><span class="n ' + cls + '">' + big + '</span><span class="l">' + unit + '</span></div>';
-    var facts = ['<span class="spec">Every <b>' + k(st.interval) + '</b>' + (sc.first ? ' · first at <b>' + k(sc.first) + '</b>' : '') + '</span>'];
+    var VERB = { change: 'Change', inspect: 'Inspect', rotate: 'Rotate', grease: 'Grease' };
+    var facts = ['<span class="spec">' + (VERB[sc.kind] || 'Every') + (VERB[sc.kind] ? ' every' : '') + ' <b>' + k(st.interval) + '</b>' + (sc.first ? ' · first at <b>' + k(sc.first) + '</b>' : '') + '</span>'];
     if (st.last_odometer != null) facts.push('<span class="spec">Last <b>' + fmt(st.last_odometer) + '</b> · ' + esc(dshort(st.last_date)) + '</span>');
     if (st.due_at != null) facts.push('<span class="spec">Due <b>' + fmt(st.due_at) + '</b>' + (st.eta ? ' · ≈ ' + esc(dmonth(st.eta)) : '') + '</span>');
     html += '<div class="facts">' + facts.join('') + '</div>';
