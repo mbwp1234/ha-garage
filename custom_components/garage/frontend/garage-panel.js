@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.4.3';
+var VERSION = '0.4.4';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
@@ -56,7 +56,7 @@ var CSS = [
 '.hs.over i{--c:var(--over);box-shadow:0 0 0 4px color-mix(in srgb,var(--over) 30%,transparent);animation:pulse 2.2s ease-out infinite}',
 '.hs.soon i{--c:var(--soon);box-shadow:0 0 0 4px color-mix(in srgb,var(--soon) 30%,transparent)}',
 '.hs.nolog i{background:repeating-linear-gradient(45deg,#9AA4B2 0 2px,#fff 2px 4px)}',
-'.hs.ok i{--c:var(--ok)}',
+'.hs.ok i{--c:var(--cav)}',
 '.hs.sel i{transform:scale(1.35);border-color:#FFD43B}',
 '.hs b{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#101623;color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center}',
 '@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--over) 55%,transparent)}100%{box-shadow:0 0 0 12px transparent}}',
@@ -64,7 +64,7 @@ var CSS = [
 '.bignum{display:flex;align-items:baseline;gap:10px}',
 '.bignum .n{font-size:64px;font-weight:200;letter-spacing:-.05em;line-height:.85}',
 '.bignum .l{font-size:15px;font-weight:600;color:var(--ink2)}',
-'.c-over{color:var(--over)}.c-soon{color:var(--soonink)}.c-ok{color:var(--ok)}.c-nolog{color:var(--ink3)}',
+'.c-over{color:var(--over)}.c-soon{color:var(--soonink)}.c-ok{color:var(--cav)}.c-nolog{color:var(--ink3)}',
 '.chips{display:flex;flex-wrap:wrap;gap:8px}',
 '.ichip{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 12px 0 5px;border-radius:18px;background:var(--card2);font-size:13px;font-weight:600}',
 '.nb{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11.5px;font-weight:700}',
@@ -162,7 +162,7 @@ var CSS = [
 '.pick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}',
 '.it{position:relative;min-height:74px;padding:6px 2px;border-radius:18px;background:var(--card2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink2);border:2px solid transparent;text-align:center}',
 '.it .nb{width:26px;height:26px;background:var(--card);color:var(--ink);border:2px solid var(--track)}',
-'.it.due .nb{border-color:var(--over)}',
+'.it.over .nb{border-color:var(--over)}.it.soon .nb{border-color:var(--soon)}.it.nolog .nb{border:1.5px dashed var(--ink3)}',
 '.it[aria-pressed="true"]{border-color:var(--cav);background:color-mix(in srgb,var(--cav) 14%,var(--card2));color:var(--ink)}',
 '.it[aria-pressed="true"] .nb{background:var(--cav);border-color:var(--cav);color:#fff}',
 ':host([dark]) .it[aria-pressed="true"] .nb{color:#0A0E18}',
@@ -226,6 +226,12 @@ function dmonth(s) {
   var far = (d.getTime() - Date.now()) / 86400000 > 300;
   return d.toLocaleDateString('en-US', far ? { month: 'short', year: 'numeric' } : { month: 'short', day: 'numeric' });
 }
+/* Seconds since HA last heard the entity (last_reported moves on a repeat of the same value). */
+function fresh(st, sec) {
+  if (!st) return false;
+  var t = new Date(st.last_reported || st.last_updated).getTime();
+  return isFinite(t) && Date.now() - t < (sec || 180) * 1000;
+}
 function today() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function ago(iso) {
   if (!iso) return '';
@@ -268,6 +274,8 @@ class GaragePanel extends HTMLElement {
     var src = h.states[v.odometer_entity];
     var sig = src ? src.state : '';
     if (sig !== this._odoSig) { this._odoSig = sig; this._soon(); }
+    var run = this._running();
+    if (run !== this._runSig) { this._runSig = run; this._render(); return; }
     this._paintTiles();
   }
   get hass() { return this._hass; }
@@ -370,10 +378,26 @@ class GaragePanel extends HTMLElement {
     return out;
   }
 
+  /* Is the engine running? WiCAN holds every ECU reading at its last value after shutdown, and
+     its ecu_online flag stays "on" while the dongle sleeps, so neither can say. The dongle's own
+     supply voltage can: above 13 V is the alternator, and it is only believed while fresh. */
+  _running() {
+    var v = this._data && this._data.vehicle;
+    if (!v || !this._hass) return false;
+    if (v.battery_entity) {
+      var b = this._hass.states[v.battery_entity], bv = num(b);
+      return bv !== null && bv >= 13.0 && fresh(b);
+    }
+    return num(this._hass.states[v.odometer_entity]) !== null && fresh(this._hass.states[v.odometer_entity]);
+  }
+
   _reading(id) {
     var st = this._hass.states[id];
     var v = num(st);
-    if (v !== null) return { v: v, unit: st.attributes.unit_of_measurement, live: true, at: st.last_updated };
+    var veh = this._data && this._data.vehicle;
+    /* The dongle's own sensors are live while it is awake; ECU readings only while the engine runs. */
+    var live = veh && id === veh.battery_entity ? fresh(st) : this._running();
+    if (v !== null) return { v: v, unit: st.attributes.unit_of_measurement, live: live, at: st.last_updated };
     var lk = this._lastKnown[id];
     if (lk) return { v: lk.v, unit: st && st.attributes.unit_of_measurement, live: false, at: lk.at };
     return null;
@@ -394,11 +418,12 @@ class GaragePanel extends HTMLElement {
     }
     var v = d.vehicle;
     var src = this._hass.states[v.odometer_entity];
-    var live = num(src) !== null;
+    var live = this._running();
+    var asOf = src && num(src) !== null ? src.last_updated : v.odometer_as_of;
     var html = head;
     html += '<div class="title"><h1>' + esc(v.name) + '</h1><div class="odo">' + I.odo + (v.odometer == null ? 'No odometer reading yet' : fmt(v.odometer) + ' mi') +
-      '<span class="live' + (live ? '' : ' off') + '" title="' + (live ? 'Live' : 'Parked') + '"></span>' +
-      (!live && v.odometer_as_of ? '<span class="mini">' + esc(ago(v.odometer_as_of)) + '</span>' : '') + '</div></div>';
+      '<span class="live' + (live ? '' : ' off') + '" title="' + (live ? 'Running' : 'Parked') + '"></span>' +
+      (!live && asOf ? '<span class="mini">' + esc(ago(asOf)) + '</span>' : '') + '</div></div>';
     if (this._err) html += '<div class="banner">' + esc(this._err) + '</div>';
     if (v.error) html += '<div class="banner">' + esc(v.error) + '</div>';
     else if (v.storage && v.storage.mounted === false) html += '<div class="banner">The garage folder isn\'t mounted, so nothing can be logged right now.</div>';
@@ -544,7 +569,9 @@ class GaragePanel extends HTMLElement {
 
   _tile(t) {
     var v = this._data.vehicle;
-    var miss = function (icon, label) { return '<div class="tl">' + icon + esc(label) + '</div><div class="num">—</div><div class="gfx"><div class="hatchbox"></div></div>'; };
+    var miss = function (icon, label, cap) { return '<div class="tl">' + icon + esc(label) + '</div><div class="num">—</div><div class="gfx"><div class="hatchbox"></div>' +
+      (cap ? '<div class="mini" style="margin-top:6px">' + esc(cap) + '</div>' : '') + '</div>'; };
+    var hs = this._hass.states;
     if (t.kind === 'fuel') {
       var e = v.economy || {};
       var r = v.fuel_entity ? this._reading(v.fuel_entity) : null;
@@ -584,17 +611,22 @@ class GaragePanel extends HTMLElement {
           (rest.length > 1 ? '<polyline points="' + pts + '" fill="none" stroke="var(--cav)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>' : '') +
           '<circle cx="' + (1 + (rest.length - 1) * step).toFixed(1) + '" cy="' + y(lastV) + '" r="3.5" fill="var(--cav)"/></svg></div>';
       }
-      var b = this._reading(t.entity);
-      if (!b) return miss(I.batt, 'Battery');
+      /* No resting history yet. Running, the voltage is the alternator's (charging, not battery
+         health); parked, only the dongle's own reading is current, never the ECU's frozen one. */
+      var running = this._running();
+      var b = running ? (this._reading(t.entity) || this._reading(v.battery_entity)) : (v.battery_entity ? this._reading(v.battery_entity) : null);
+      if (!b) return miss(I.batt, 'Battery', 'waiting for a rest reading');
       var p = Math.max(0, Math.min(100, (b.v - 11.5) / 3.5 * 100));
-      return this._tl(I.batt, 'Battery', b) + '<div class="num">' + b.v.toFixed(1) + '<small>V</small></div><div class="gfx"><div class="meter" role="img" aria-label="' + b.v.toFixed(1) + ' volts">' +
+      var tag = running ? 'charging' : (b.live ? 'parked' : ago(b.at));
+      var ok = running ? [54, 40] : [26, 11];
+      return '<div class="tl">' + I.batt + 'Battery<span class="age">' + esc(tag) + '</span></div><div class="num">' + b.v.toFixed(1) + '<small>V</small></div><div class="gfx"><div class="meter" role="img" aria-label="' + b.v.toFixed(1) + ' volts, ' + esc(tag) + '">' +
         '<span class="band" style="left:0;width:20%;background:color-mix(in srgb,var(--over) 30%,transparent)"></span>' +
-        '<span class="band" style="left:54%;width:40%;background:color-mix(in srgb,var(--ok) 30%,transparent)"></span>' +
+        '<span class="band" style="left:' + ok[0] + '%;width:' + ok[1] + '%;background:color-mix(in srgb,var(--ok) 30%,transparent)"></span>' +
         '<span class="mk" style="left:' + p.toFixed(1) + '%"></span></div></div>';
     }
     if (t.kind === 'codes') {
       var mil = this._reading(t.mil), cnt = this._reading(t.count), since = t.since ? this._reading(t.since) : null;
-      if (!mil && !cnt) return miss(I.engine, 'Engine');
+      if (!mil && !cnt) return miss(I.engine, 'Engine', !hs[t.mil] && !hs[t.count] ? 'not reporting' : 'no reading');
       var on = mil && mil.v >= 1, n = cnt ? Math.round(cnt.v) : null;
       var sinceMi = since ? (since.unit === 'km' ? since.v * 0.621371 : since.v) : null;
       var col = on ? 'var(--over)' : 'var(--ok)';
@@ -605,7 +637,8 @@ class GaragePanel extends HTMLElement {
     if (t.kind === 'trim') {
       var rs = (t.entities || []).map(this._reading, this).filter(Boolean);
       if (!rs.length) return miss(I.trim, 'Trim');
-      var avg = rs.reduce(function (a, x) { return a + x.v; }, 0) / rs.length;
+      /* The bank furthest from zero is the one that matters; a mean can hide a lean bank. */
+      var avg = rs.reduce(function (a, x) { return Math.abs(x.v) > Math.abs(a.v) ? x : a; }).v;
       var mk = rs.map(function (x, i) {
         var q = Math.max(0, Math.min(100, (x.v + 25) / 50 * 100));
         return '<span class="mk" style="left:' + q.toFixed(1) + '%' + (i ? ';border-color:var(--cav)' : '') + '"></span>';
@@ -759,8 +792,8 @@ class GaragePanel extends HTMLElement {
     var items = this._items();
     html += '<div class="pick" role="group" aria-label="What was done">' + v.schedule.items.map(function (it) {
       var st = items.find(function (x) { return x.n === it.n; }) || {};
-      var due = st.status === 'over' || st.status === 'soon' || (s.catchup && st.status === 'nolog');
-      return '<button class="it' + (due ? ' due' : '') + '" data-act="pick" data-n="' + it.n + '" aria-pressed="' + (sel.indexOf(it.n) >= 0) + '"><span class="nb">' + it.n + '</span>' + esc(it.short) + '</button>';
+      var mark = st.status === 'over' || st.status === 'soon' || (s.catchup && st.status === 'nolog') ? ' ' + st.status : '';
+      return '<button class="it' + mark + '" data-act="pick" data-n="' + it.n + '" aria-pressed="' + (sel.indexOf(it.n) >= 0) + '"><span class="nb">' + it.n + '</span>' + esc(it.short) + '</button>';
     }).join('') + '</div>';
     html += '<div class="acts" id="g-acts">' + this._actRows(s) + '</div>';
     var by = e ? (e.by || '') : (s.by || '');
@@ -933,6 +966,14 @@ class GaragePanel extends HTMLElement {
   }
 
   async _doneToday(n) {
+    if (this._busy) return;
+    this._busy = true;
+    var btn = this.shadowRoot.querySelector('[data-act="done"]');
+    if (btn) btn.disabled = true;
+    try { await this._doneTodayRun(n); } finally { this._busy = false; if (btn) btn.disabled = false; }
+  }
+
+  async _doneTodayRun(n) {
     var v = this._data.vehicle;
     var it = this._sched(n);
     var KIND = { change: 'changed', inspect: 'inspected', rotate: 'rotated', grease: 'greased' };
@@ -946,6 +987,14 @@ class GaragePanel extends HTMLElement {
   }
 
   async _undo(id) {
+    if (this._busy) return;
+    this._busy = true;
+    var btn = this.shadowRoot.querySelector('[data-act="undo"]');
+    if (btn) btn.disabled = true;
+    try { await this._undoRun(id); } finally { this._busy = false; if (btn) btn.disabled = false; }
+  }
+
+  async _undoRun(id) {
     try {
       await this._hass.callWS({ type: 'garage/delete', entry_id: this._data.vehicle.entry_id, log_id: id });
       this._sheet.doneId = null;

@@ -28,7 +28,7 @@ def _load(name):
     return mod
 
 
-def fixture(folder: Path, odometer: float, schedule_id: str, states: dict) -> dict:
+def fixture(folder: Path, odometer: float, schedule_id: str, states: dict, battery: str | None = None) -> dict:
     sched = _load("schedule")
     s = sched.load_schedule(schedule_id)
     log = json.loads((folder / "log.json").read_text())["entries"] if (folder / "log.json").exists() else []
@@ -54,7 +54,7 @@ def fixture(folder: Path, odometer: float, schedule_id: str, states: dict) -> di
         "economy": {"mpg": eco["mpg"], "segments": eco["segments"], "range": gst.range_miles(last.get("litres"), mpg),
                     "range_basis": ("learned" if eco["mpg"] else "assumed") if mpg else None, "litres": last.get("litres"),
                     "as_of": last.get("at"), "percent": None},
-        "refuels": stats.get("refuels", [])[-12:], "rest": stats.get("rest", [])[-40:], "battery_entity": None,
+        "refuels": stats.get("refuels", [])[-12:], "rest": stats.get("rest", [])[-40:], "battery_entity": battery,
     }
     return {"vehicles": [{"entry_id": "dev", "name": vehicle["name"]}], "vehicle": vehicle, "log": log,
             "settings": settings, "states": states}
@@ -65,8 +65,8 @@ HARNESS = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewpo
 <script src="/panel.js"></script>
 <script>
 var FIX = __FIX__;
-function st(v, unit){ return {state: v == null ? 'unavailable' : String(v), attributes: {unit_of_measurement: unit}, last_updated: new Date().toISOString()}; }
-var states = {}; Object.keys(FIX.states).forEach(function(k){ var x = FIX.states[k]; states[k] = st(x[0], x[1]); });
+function st(v, unit, age){ var t = new Date(Date.now() - (age || 0) * 1000).toISOString(); return {state: v == null ? 'unavailable' : String(v), attributes: {unit_of_measurement: unit}, last_updated: t, last_reported: t}; }
+var states = {}; Object.keys(FIX.states).forEach(function(k){ var x = FIX.states[k]; states[k] = st(x[0], x[1], x[2]); });
 var hass = { states: states, themes: {darkMode: __DARK__},
   callWS: async function(m){ if (m.type === 'garage/get') return FIX; return {result: {id: 'x'}, vehicle: FIX.vehicle}; },
   callApi: async function(){ return []; },
@@ -82,13 +82,14 @@ def main() -> None:
     ap.add_argument("folder")
     ap.add_argument("odometer", type=float)
     ap.add_argument("--schedule", default="toyota_tacoma_3g")
-    ap.add_argument("--tiles", help="JSON {entity_id: [value, unit]} for the stat tiles")
+    ap.add_argument("--tiles", help="JSON {entity_id: [value, unit, age_seconds?]} for the stat tiles")
+    ap.add_argument("--battery", help="the dongle supply-voltage entity (battery_entity option)")
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
 
     folder = Path(a.folder)
     states = json.loads(Path(a.tiles).read_text()) if a.tiles else {}
-    fix = fixture(folder, a.odometer, a.schedule, states)
+    fix = fixture(folder, a.odometer, a.schedule, states, a.battery)
     panel = (COMP / "frontend" / "garage-panel.js").read_text()
     ver = panel.split("var VERSION = '")[1].split("'")[0]
     tag = "garage-panel-" + ver.replace(".", "-")
