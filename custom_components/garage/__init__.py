@@ -43,7 +43,7 @@ from .const import (
     SERVICE_PROFILE,
     SIGNAL_UPDATED,
 )
-from .schedule import DEFAULT_ACTION, ItemStatus, compute, load_schedule, summary
+from .schedule import DEFAULT_ACTION, ItemStatus, compute, load_schedule, pace_per_day, summary
 from .store import GarageError, GarageStore, StoreConfig
 
 _LOGGER = logging.getLogger(__name__)
@@ -72,6 +72,8 @@ class GarageRuntime:
     summary: dict[str, Any] = field(default_factory=dict)
     storage: dict[str, Any] = field(default_factory=dict)
     error: str | None = None
+    pace: float | None = None              # miles per day from the log
+    points: list[list[Any]] = field(default_factory=list)
 
     async def async_refresh(self) -> None:
         def work():
@@ -92,6 +94,10 @@ class GarageRuntime:
         self.statuses = compute(self.schedule, entries, self.odometer, dt_util.now().date(),
                                 settings.get("profile", {}), settings.get("months", {}))
         self.summary = summary(self.statuses)
+        today = dt_util.now().date()
+        self.pace = pace_per_day(entries, self.odometer, today)
+        self.points = sorted([e["date"], e["odometer"]] for e in entries
+                             if e.get("odometer") is not None and e.get("date"))
         async_dispatcher_send(self.hass, SIGNAL_UPDATED.format(self.entry_id))
 
     def device_info(self) -> dict[str, Any]:
@@ -176,8 +182,8 @@ async def _async_register_globals(hass: HomeAssistant) -> None:
         websocket_api.async_register_command(hass, ws_delete)
         websocket_api.async_register_command(hass, ws_profile)
         hass.http.register_view(GarageImageView())
-        if PANEL_FILE.exists():
-            await hass.http.async_register_static_paths([StaticPathConfig(PANEL_JS_URL, str(PANEL_FILE), False)])
+        # Registered even before a panel file exists: routes can't be added later without a restart.
+        await hass.http.async_register_static_paths([StaticPathConfig(PANEL_JS_URL, str(PANEL_FILE), False)])
         _register_services(hass)
         _GLOBALS_REGISTERED = True
     if not _PANEL_REGISTERED:
@@ -226,6 +232,7 @@ def snapshot(rt: GarageRuntime) -> dict[str, Any]:
         "odometer": rt.odometer, "odometer_as_of": rt.odometer_as_of, "odometer_entity": rt.odometer_entity,
         "fuel_entity": rt.fuel_entity, "tank_l": rt.tank_l, "fuel": fuel,
         "schedule": rt.schedule, "summary": rt.summary,
+        "pace": None if rt.pace is None else round(rt.pace, 1), "points": rt.points,
         "items": [s.as_dict() for s in rt.statuses],
     }
 

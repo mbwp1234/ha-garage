@@ -1,0 +1,137 @@
+"""Render the panel in headless Chromium against a vehicle folder and take screenshots.
+
+    python dev/shoot.py <vehicle-folder> <odometer> [--tiles states.json]
+
+The folder holds log.json / settings.json / truck.png exactly as on the share. Nothing is
+written back. Shots land in dev/out/ (git-ignored: they show real data).
+Needs playwright (pip install playwright; playwright install chromium).
+"""
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+import sys
+from datetime import date
+from pathlib import Path
+
+ROOT = Path(__file__).parents[1]
+COMP = ROOT / "custom_components" / "garage"
+OUT = ROOT / "dev" / "out"
+
+
+def _load(name):
+    spec = importlib.util.spec_from_file_location(f"g_{name}", COMP / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[f"g_{name}"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def fixture(folder: Path, odometer: float, schedule_id: str, states: dict) -> dict:
+    sched = _load("schedule")
+    s = sched.load_schedule(schedule_id)
+    log = json.loads((folder / "log.json").read_text())["entries"] if (folder / "log.json").exists() else []
+    log = [e for e in log if not e.get("deleted")]
+    settings = json.loads((folder / "settings.json").read_text()) if (folder / "settings.json").exists() else {}
+    today = date.today()
+    st = sched.compute(s, log, odometer, today, settings.get("profile", {}), settings.get("months", {}))
+    pace = sched.pace_per_day(log, odometer, today)
+    vehicle = {
+        "entry_id": "dev", "name": "Tacoma" if "taco" in folder.name.lower() else "Example", "error": None,
+        "storage": {"mounted": True, "exists": True, "has_log": True}, "odometer": odometer,
+        "odometer_as_of": "2026-01-01T00:00:00+00:00", "odometer_entity": "sensor.dev_odometer",
+        "fuel_entity": "sensor.dev_fuel", "tank_l": 79.9,
+        "fuel": None, "schedule": s, "summary": sched.summary(st), "pace": None if pace is None else round(pace, 1),
+        "points": sorted([e["date"], e["odometer"]] for e in log if e.get("odometer") is not None),
+        "items": [x.as_dict() for x in st],
+    }
+    return {"vehicles": [{"entry_id": "dev", "name": vehicle["name"]}], "vehicle": vehicle, "log": log,
+            "settings": settings, "states": states}
+
+
+HARNESS = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;height:100%}</style></head><body>
+<script src="/panel.js"></script>
+<script>
+var FIX = __FIX__;
+function st(v, unit){ return {state: v == null ? 'unavailable' : String(v), attributes: {unit_of_measurement: unit}, last_updated: new Date().toISOString()}; }
+var states = {}; Object.keys(FIX.states).forEach(function(k){ var x = FIX.states[k]; states[k] = st(x[0], x[1]); });
+var hass = { states: states, themes: {darkMode: __DARK__},
+  callWS: async function(m){ if (m.type === 'garage/get') return FIX; return {result: {id: 'x'}, vehicle: FIX.vehicle}; },
+  callApi: async function(){ return []; },
+  fetchWithAuth: function(u){ return fetch('/truck.png'); } };
+var tag = [...document.querySelectorAll('script')].length && Object.keys(window).length;
+customElements.whenDefined('__TAG__').then(function(){
+  var el = document.createElement('__TAG__'); el.narrow = __NARROW__; el.hass = hass; document.body.appendChild(el); window.el = el; });
+</script></body></html>"""
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("folder")
+    ap.add_argument("odometer", type=float)
+    ap.add_argument("--schedule", default="toyota_tacoma_3g")
+    ap.add_argument("--tiles", help="JSON {entity_id: [value, unit]} for the stat tiles")
+    a = ap.parse_args()
+    from playwright.sync_api import sync_playwright
+
+    folder = Path(a.folder)
+    states = json.loads(Path(a.tiles).read_text()) if a.tiles else {}
+    fix = fixture(folder, a.odometer, a.schedule, states)
+    panel = (COMP / "frontend" / "garage-panel.js").read_text()
+    ver = panel.split("var VERSION = '")[1].split("'")[0]
+    tag = "garage-panel-" + ver.replace(".", "-")
+    img = next((folder / n for n in ("truck.png", "truck.jpg", "vehicle.png") if (folder / n).exists()), None)
+    OUT.mkdir(parents=True, exist_ok=True)
+
+    def page_for(pw_page, dark, narrow):
+        html = (HARNESS.replace("__FIX__", json.dumps(fix)).replace("__DARK__", "true" if dark else "false")
+                .replace("__NARROW__", "true" if narrow else "false").replace("__TAG__", tag))
+
+        def route(r):
+            u = r.request.url
+            if u.endswith("/panel.js"):
+                r.fulfill(body=panel, content_type="application/javascript")
+            elif u.endswith("/truck.png") and img:
+                r.fulfill(body=img.read_bytes(), content_type="image/png")
+            elif u.startswith("http://garage.test/"):
+                r.fulfill(body=html, content_type="text/html")
+            else:
+                r.continue_()
+        pw_page.route("**/*", route)
+        errors = []
+        pw_page.on("pageerror", lambda e: errors.append(str(e)))
+        pw_page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+        pw_page.goto("http://garage.test/index.html")
+        pw_page.wait_for_timeout(900)
+        return errors
+
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        shots = []
+        for name, w, h, dark, narrow in [("phone-light", 390, 2700, False, True), ("phone-dark", 390, 2700, True, True),
+                                         ("desktop", 1400, 1500, False, False)]:
+            pg = b.new_page(viewport={"width": w, "height": h}, device_scale_factor=2 if w < 500 else 1)
+            errs = page_for(pg, dark, narrow)
+            sw = pg.evaluate("() => { const r = el.shadowRoot.querySelector('.scroll'); return [r.scrollWidth, r.clientWidth]; }")
+            pg.screenshot(path=str(OUT / f"{name}.png"))
+            shots.append((name, errs, sw))
+            pg.close()
+        pg = b.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
+        errs = page_for(pg, False, True)
+        for nm, sel in [("sheet-item", "[data-act=item][data-n='1']"), ("sheet-log", "[data-act=log]"),
+                        ("sheet-map", "[data-act=poster]"), ("sheet-catchup", "[data-act=catchup]")]:
+            pg.evaluate("s => el.shadowRoot.querySelector(s).click()", sel)
+            pg.wait_for_timeout(500)
+            pg.screenshot(path=str(OUT / f"{nm}.png"))
+            pg.evaluate("() => el.shadowRoot.querySelector('[data-act=close].x').click()")
+            pg.wait_for_timeout(400)
+        shots.append(("sheets", errs, None))
+        b.close()
+    for name, errs, sw in shots:
+        print(name, "errors:", errs or "none", "scroll(w,client):", sw)
+
+
+if __name__ == "__main__":
+    main()
