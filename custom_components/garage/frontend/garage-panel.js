@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.4.1';
+var VERSION = '0.4.3';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
@@ -167,6 +167,9 @@ var CSS = [
 '.it[aria-pressed="true"] .nb{background:var(--cav);border-color:var(--cav);color:#fff}',
 ':host([dark]) .it[aria-pressed="true"] .nb{color:#0A0E18}',
 '.err{color:var(--over);font-weight:600;font-size:13px;padding:0 4px}',
+'.acts{display:flex;flex-direction:column;gap:8px}',
+'.act{display:grid;grid-template-columns:minmax(0,1fr) 210px;align-items:center;gap:10px;font-size:13px;font-weight:600;padding-left:4px}',
+'.act .seg button{height:36px}',
 /* full map */
 '.poster{display:flex;align-items:flex-end;gap:6px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;padding:8px 2px 4px;scroll-snap-type:x proximity}',
 '.pc{flex:none;width:34px;display:flex;flex-direction:column;align-items:center;gap:4px;scroll-snap-align:center}',
@@ -721,7 +724,7 @@ class GaragePanel extends HTMLElement {
     var done = this._sheet && this._sheet.doneId;
     html += '<div class="btns">' + (done
       ? '<button class="pri done" data-act="undo" data-id="' + esc(done) + '">' + I.check + 'Logged · Undo</button>'
-      : '<button class="pri" data-act="done" data-n="' + n + '"' + (v.odometer == null ? ' disabled' : '') + '>' + I.check + 'Done today</button>') +
+      : '<button class="pri" data-act="done" data-n="' + n + '"' + (v.odometer == null ? ' disabled' : '') + '>' + I.check + (sc.kind === 'inspect' ? 'Inspected today' : 'Done today') + '</button>') +
       '<button class="sec" data-act="log" data-n="' + n + '">Log…</button></div>';
     return html;
   }
@@ -759,6 +762,7 @@ class GaragePanel extends HTMLElement {
       var due = st.status === 'over' || st.status === 'soon' || (s.catchup && st.status === 'nolog');
       return '<button class="it' + (due ? ' due' : '') + '" data-act="pick" data-n="' + it.n + '" aria-pressed="' + (sel.indexOf(it.n) >= 0) + '"><span class="nb">' + it.n + '</span>' + esc(it.short) + '</button>';
     }).join('') + '</div>';
+    html += '<div class="acts" id="g-acts">' + this._actRows(s) + '</div>';
     var by = e ? (e.by || '') : (s.by || '');
     html += '<div class="seg" role="group" aria-label="Done by">' + [['self', 'Me'], ['dealer', 'Dealer'], ['shop', 'Shop']].map(function (b) {
       return '<button data-act="by" data-by="' + b[0] + '" aria-pressed="' + (by === b[0]) + '">' + b[1] + '</button>';
@@ -771,6 +775,21 @@ class GaragePanel extends HTMLElement {
     html += '<div class="btns" style="grid-template-columns:' + (e ? '1fr auto' : '1fr') + '"><button class="pri" data-act="save"' + (n ? '' : ' disabled') + '>' + I.check + label + '</button>' +
       (e ? '<button class="sec danger' + (this._armed === 'del' ? ' armed' : '') + '" data-act="del">' + (this._armed === 'del' ? 'Delete?' : 'Delete') + '</button>' : '') + '</div>';
     return html;
+  }
+
+  /* An inspection item can be inspected OR replaced: both reset its clock, but a
+     replacement is a different fact (new pads), so the form asks rather than assumes. */
+  _actRows(s) {
+    var sched = this._data.vehicle.schedule.items;
+    s.acts = s.acts || {};
+    return (s.sel || []).slice().sort(function (a, b) { return a - b; }).map(function (n) {
+      var it = sched.find(function (x) { return x.n === n; });
+      if (!it || it.kind !== 'inspect') return '';
+      var a = s.acts[n] || 'inspected';
+      return '<div class="act"><span>' + esc(it.short) + '</span><div class="seg" role="group" aria-label="' + esc(it.short) + '">' +
+        '<button data-act="kind" data-n="' + n + '" data-k="inspected" aria-pressed="' + (a === 'inspected') + '">Inspected</button>' +
+        '<button data-act="kind" data-n="' + n + '" data-k="changed" aria-pressed="' + (a === 'changed') + '">Replaced</button></div></div>';
+    }).join('');
   }
 
   /* The printed map, rebuilt from the schedule: every 5k to 300k, normal items as circles
@@ -825,14 +844,25 @@ class GaragePanel extends HTMLElement {
     }
     if (a === 'edit') {
       var en = (this._data.log || []).find(function (x) { return x.id === el.dataset.id; });
-      if (en) this._open({ kind: 'log', id: en.id, sel: (en.items || []).map(function (i) { return i.n; }), by: en.by || '' });
+      var acts = {};
+      if (en) (en.items || []).forEach(function (i) { acts[i.n] = i.action; });
+      if (en) this._open({ kind: 'log', id: en.id, sel: (en.items || []).map(function (i) { return i.n; }), by: en.by || '', acts: acts });
       return;
     }
     if (a === 'pick') {
       var s = this._sheet, i = s.sel.indexOf(n);
       if (i >= 0) s.sel.splice(i, 1); else s.sel.push(n);
       el.setAttribute('aria-pressed', i < 0);
+      var ar = this.shadowRoot.getElementById('g-acts');
+      if (ar) ar.innerHTML = this._actRows(s);
       this._paintSave();
+      return;
+    }
+    if (a === 'kind') {
+      var sk = this._sheet;
+      sk.acts = sk.acts || {};
+      sk.acts[n] = el.dataset.k;
+      el.parentNode.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b === el); });
       return;
     }
     if (a === 'by') {
@@ -888,7 +918,8 @@ class GaragePanel extends HTMLElement {
       by: s.by || '',
       items: s.sel.slice().sort(function (a, b) { return a - b; }).map(function (n) {
         var it = schedule.find(function (x) { return x.n === n; });
-        return { n: n, action: KIND[it.kind] || 'changed' };
+        var act = it.kind === 'inspect' && s.acts && s.acts[n] ? s.acts[n] : (KIND[it.kind] || 'changed');
+        return { n: n, action: act };
       })
     };
   }

@@ -131,7 +131,8 @@ def main() -> None:
         pg = b.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
         errs = page_for(pg, False, True)
         for nm, sel in [("sheet-item", "[data-act=item][data-n='1']"), ("sheet-log", "[data-act=log]"),
-                        ("sheet-map", "[data-act=poster]"), ("sheet-catchup", "[data-act=catchup]")]:
+                        ("sheet-map", "[data-act=poster]"), ("sheet-catchup", "[data-act=catchup]"),
+                        ("sheet-edit", "[data-act=edit]")]:
             pg.evaluate("s => el.shadowRoot.querySelector(s).click()", sel)
             pg.wait_for_timeout(500)
             pg.screenshot(path=str(OUT / f"{nm}.png"))
