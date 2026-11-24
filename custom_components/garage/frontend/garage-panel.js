@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.4.0';
+var VERSION = '0.4.1';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
@@ -852,7 +852,7 @@ class GaragePanel extends HTMLElement {
         return;
       }
       this._armed = null;
-      this._write({ type: 'garage/delete', id: this._sheet.id }, 'Entry deleted');
+      this._write({ type: 'garage/delete', log_id: this._sheet.id }, 'Entry deleted');
       return;
     }
     if (a === 'done') { this._doneToday(n); return; }
@@ -897,7 +897,7 @@ class GaragePanel extends HTMLElement {
     var s = this._sheet;
     var entry = this._formEntry();
     if (!entry.date) { this._sheetError('Pick the date it was done.'); return; }
-    if (s.id) await this._write({ type: 'garage/update', id: s.id, entry: entry }, 'Saved');
+    if (s.id) await this._write({ type: 'garage/update', log_id: s.id, entry: entry }, 'Saved');
     else await this._write({ type: 'garage/add', entry: entry }, entry.items.length === 1 ? 'Logged' : 'Logged ' + entry.items.length + ' items');
   }
 
@@ -916,7 +916,7 @@ class GaragePanel extends HTMLElement {
 
   async _undo(id) {
     try {
-      await this._hass.callWS({ type: 'garage/delete', entry_id: this._data.vehicle.entry_id, id: id });
+      await this._hass.callWS({ type: 'garage/delete', entry_id: this._data.vehicle.entry_id, log_id: id });
       this._sheet.doneId = null;
       await this._load();
       this._renderSheet(true);

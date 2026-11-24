@@ -244,6 +244,11 @@ def _track_learning(hass: HomeAssistant, entry: ConfigEntry, rt: GarageRuntime) 
             async_dispatcher_send(hass, SIGNAL_UPDATED.format(rt.entry_id))
 
     if rt.fuel_entity:
+        if not rt.stats.get("fuel_last"):
+            litres = _num(hass.states.get(rt.fuel_entity))
+            if litres is not None:
+                gstats.on_fuel(rt.stats, litres, rt.odometer, dt_util.utcnow().isoformat(timespec="seconds"), rt.tank_l)
+                hass.async_create_task(save(force=True))
         entry.async_on_unload(async_track_state_change_event(hass, [rt.fuel_entity], fuel_changed))
     if rt.battery_entity:
         rt.batt_last = _num(hass.states.get(rt.battery_entity))
@@ -453,23 +458,25 @@ async def ws_add(hass, connection, msg):
     await _ws_write(hass, connection, msg, work)
 
 
+# NOT "id": the websocket protocol owns that key (it is the message counter), so a
+# command field named id is silently replaced by an integer before it reaches us.
 @websocket_api.websocket_command({vol.Required("type"): "garage/update", vol.Optional("entry_id"): str,
-                                  vol.Required("id"): str, vol.Required("entry"): dict})
+                                  vol.Required("log_id"): str, vol.Required("entry"): dict})
 @websocket_api.async_response
 async def ws_update(hass, connection, msg):
     def work(rt, name):
         data = dict(msg["entry"])
         if "items" in data:
             data["items"] = _items_arg(rt, data["items"] or [])
-        return rt.store.update(msg["id"], data, name)
+        return rt.store.update(msg["log_id"], data, name)
     await _ws_write(hass, connection, msg, work)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "garage/delete", vol.Optional("entry_id"): str,
-                                  vol.Required("id"): str})
+                                  vol.Required("log_id"): str})
 @websocket_api.async_response
 async def ws_delete(hass, connection, msg):
-    await _ws_write(hass, connection, msg, lambda rt, name: rt.store.delete(msg["id"], name))
+    await _ws_write(hass, connection, msg, lambda rt, name: rt.store.delete(msg["log_id"], name))
 
 
 @websocket_api.websocket_command({vol.Required("type"): "garage/set_profile", vol.Optional("entry_id"): str,
