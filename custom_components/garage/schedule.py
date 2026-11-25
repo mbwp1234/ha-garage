@@ -211,18 +211,24 @@ def compute(schedule: dict[str, Any], entries: list[dict[str, Any]], odometer: f
     return out
 
 
-def summary(statuses: list[ItemStatus]) -> dict[str, Any]:
+def summary(statuses: list[ItemStatus], logged: int | None = None) -> dict[str, Any]:
+    """`logged` is how many log entries the vehicle has. With none at all, the first item
+    whose due point is known (coolant at 120k on a new car) is not the next service: it is
+    only the next one we can see, so it goes in `next_known` and `next` stays empty."""
     counts = {k: 0 for k in STATUS_RANK}
     for s in statuses:
         counts[s.status] += 1
     ahead = [s for s in statuses if s.remaining is not None and s.status != "over"]
     ahead.sort(key=lambda s: s.remaining)
     nxt = ahead[0] if ahead else None
+    as_dict = None if nxt is None else {"n": nxt.n, "short": nxt.short, "name": nxt.name,
+                                        "remaining": nxt.remaining, "eta": nxt.eta}
+    blind = logged == 0 and counts["nolog"] > 0
     return {
         "over": counts["over"], "soon": counts["soon"], "nolog": counts["nolog"], "ok": counts["ok"],
         "overdue_items": [s.short for s in statuses if s.status == "over"],
-        "next": None if nxt is None else {"n": nxt.n, "short": nxt.short, "name": nxt.name,
-                                          "remaining": nxt.remaining, "eta": nxt.eta},
+        "next": None if blind else as_dict,
+        "next_known": as_dict,
     }
 
 

@@ -59,3 +59,24 @@ def test_header_renders_before_any_data():
 def test_harness_sets_hass_before_narrow_like_home_assistant():
     shoot = (ROOT.parents[1] / "dev" / "shoot.py").read_text()
     assert "el.hass = hass; el.narrow = __NARROW__;" in shoot
+
+
+def test_map_groups_visits_by_due_distance_not_pixels():
+    """v0.7: stops were buckets 9% of the strip wide (~5k mi), so "Next stop 85.7k - 92.0k"
+    sold ten months of driving as one visit. Visits are now grouped by due distance."""
+    body = JS.split("  _road(v) {")[1].split("\n  _list(v) {")[0]
+    assert "i.due_at - last.at <= 1000 && days <= 30" in body
+    assert "'Next visits'" in body and "<b>Next known</b>" in body
+    assert "mi/day" not in body            # the Pace tile owns pace
+    assert 'class="nologrow"' not in body  # the list owns never-logged
+
+
+def test_never_logged_folds_and_toggles():
+    assert "data-act=\"nolog\"" in JS and "a === 'nolog'" in JS
+    assert "this._showNolog = false" in JS
+
+
+def test_hero_does_not_repeat_the_list():
+    body = JS.split("  _hero(v) {")[1].split("\n  _layoutPills() {")[0]
+    branch = body.split("} else if (s.over || s.soon) {")[1].split("} else if (fresh0) {")[0]
+    assert "chips = [];" in branch

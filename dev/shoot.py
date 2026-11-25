@@ -49,7 +49,7 @@ def fixture(folder: Path, odometer: float | None, schedule_id: str, states: dict
         "storage": {"mounted": True, "exists": True, "has_log": True}, "odometer": odometer,
         "odometer_as_of": "2026-01-01T00:00:00+00:00", "odometer_entity": None if typed else "sensor.dev_odometer",
         "fuel_entity": None if typed else "sensor.dev_fuel", "tank_l": 79.9,
-        "fuel": None, "schedule": s, "summary": sched.summary(st), "pace": None if pace is None else round(pace, 1),
+        "fuel": None, "schedule": s, "summary": sched.summary(st, len(log)), "pace": None if pace is None else round(pace, 1),
         "points": sorted([e["date"], e["odometer"]] for e in log if e.get("odometer") is not None),
         "items": [x.as_dict() for x in st],
         "economy": {"mpg": eco["mpg"], "segments": eco["segments"], "range": gst.range_miles(last.get("litres"), mpg),

@@ -107,7 +107,7 @@ class GarageRuntime:
         self.assumed_mpg = settings.get("mpg") if isinstance(settings.get("mpg"), (int, float)) else None
         self.statuses = compute(self.schedule, entries, self.odometer, dt_util.now().date(),
                                 settings.get("profile", {}), settings.get("months", {}))
-        self.summary = summary(self.statuses)
+        self.summary = summary(self.statuses, len(entries))
         today = dt_util.now().date()
         self.pace = pace_per_day(entries, self.odometer, today)
         self.points = sorted([e["date"], e["odometer"]] for e in entries
