@@ -292,7 +292,11 @@ def _panel_file_info() -> tuple[int, str] | None:
 
 async def _async_register_globals(hass: HomeAssistant) -> None:
     global _GLOBALS_REGISTERED, _PANEL_REGISTERED
+    # Claimed BEFORE the first await: with two vehicles both entries set up at once, and a
+    # flag set after the await let both through — the second died on "GET is already
+    # registered" and that vehicle's entities went unavailable (v0.7.0, first restart).
     if not _GLOBALS_REGISTERED:
+        _GLOBALS_REGISTERED = True
         websocket_api.async_register_command(hass, ws_get)
         websocket_api.async_register_command(hass, ws_add)
         websocket_api.async_register_command(hass, ws_update)
@@ -305,8 +309,8 @@ async def _async_register_globals(hass: HomeAssistant) -> None:
         # Registered even before a panel file exists: routes can't be added later without a restart.
         await hass.http.async_register_static_paths([StaticPathConfig(PANEL_JS_URL, str(PANEL_FILE), False)])
         _register_services(hass)
-        _GLOBALS_REGISTERED = True
     if not _PANEL_REGISTERED:
+        _PANEL_REGISTERED = True
         info = await hass.async_add_executor_job(_panel_file_info)
         if info:
             stamp, version = info
@@ -319,7 +323,8 @@ async def _async_register_globals(hass: HomeAssistant) -> None:
                                           "js_url": f"{PANEL_JS_URL}?v={stamp}"}},
                 require_admin=False, update=True,
             )
-            _PANEL_REGISTERED = True
+        else:
+            _PANEL_REGISTERED = False          # no panel file yet: try again on the next setup
 
 
 def _rt(hass: HomeAssistant, entry_id: str | None) -> GarageRuntime:

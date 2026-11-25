@@ -19,3 +19,15 @@ def test_the_panel_never_sends_a_bare_id_to_garage_commands():
     calls = re.findall(r"\{ ?type: 'garage/[a-z_]+'[^}]*\}", js)
     assert calls, "found no garage/* calls to check"
     assert not [c for c in calls if re.search(r"[{,]\s*id:", c)]
+
+
+def test_once_only_registration_is_claimed_before_any_await():
+    """Two vehicles set up concurrently. A flag set AFTER an await let both entries into the
+    block; the second died on a duplicate route and its vehicle went unavailable."""
+    src = (ROOT / "__init__.py").read_text()
+    body = src.split("async def _async_register_globals")[1].split("\ndef ")[0]
+    for flag in ("_GLOBALS_REGISTERED = True", "_PANEL_REGISTERED = True"):
+        guard = body.index("if not " + flag.split(" =")[0] + ":")
+        claim = body.index(flag, guard)
+        first_await = body.find("await ", guard)
+        assert claim < first_await, flag
