@@ -41,3 +41,9 @@ def test_every_label_fits_the_list_column():
     for f in (ROOT / "schedules").glob("*.json"):
         for it in json.loads(f.read_text())["items"]:
             assert len(it["short"]) <= 12, (f.name, it["short"])
+
+
+def test_dashboard_deep_link_switches_vehicle_on_navigation():
+    assert "window.addEventListener('location-changed', this._onNav)" in JS
+    assert "removeEventListener('location-changed', this._onNav)" in JS
+    assert "_fromUrl() {" in JS and JS.count("._fromUrl()") >= 2

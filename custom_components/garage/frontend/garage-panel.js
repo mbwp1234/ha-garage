@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.7.0';
+var VERSION = '0.7.1';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
@@ -351,8 +351,32 @@ class GaragePanel extends HTMLElement {
       self.style.setProperty('--g-top', Math.max(0, Math.round(top)) + 'px');
     });
     if (!this._poll) this._poll = setInterval(function () { if (!document.hidden) self._load(); }, 60000);
+    /* HA keeps the panel element between visits, so a second tap from the dashboard
+       (the Kona after the Tacoma) arrives as a navigation, not a new element. */
+    if (!this._onNav) {
+      this._onNav = function () { self._fromUrl(); };
+      window.addEventListener('location-changed', this._onNav);
+    }
+    this._fromUrl();
   }
-  disconnectedCallback() { clearInterval(this._poll); this._poll = null; }
+
+  _fromUrl() {
+    var want = null;
+    try { want = new URLSearchParams(location.search).get('vehicle'); } catch (e) { want = null; }
+    if (!want || !this._hass) return;
+    var vs = (this._data && this._data.vehicles) || [];
+    var hit = vs.find(function (x) { return x.entry_id === want || String(x.name).toLowerCase() === want.toLowerCase(); });
+    var cur = this._data && this._data.vehicle;
+    if (cur && hit && hit.entry_id === cur.entry_id) return;
+    this._entry = hit ? hit.entry_id : want;
+    this._zone = null; this._showAll = false;
+    if (this._sheet) this._close();
+    this._load();
+  }
+  disconnectedCallback() {
+    clearInterval(this._poll); this._poll = null;
+    if (this._onNav) { window.removeEventListener('location-changed', this._onNav); this._onNav = null; }
+  }
 
   _mount() {
     /* @font-face is ignored inside a shadow root, so the font is linked from the page. */
