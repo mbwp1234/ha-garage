@@ -47,3 +47,15 @@ def test_dashboard_deep_link_switches_vehicle_on_navigation():
     assert "window.addEventListener('location-changed', this._onNav)" in JS
     assert "removeEventListener('location-changed', this._onNav)" in JS
     assert "_fromUrl() {" in JS and JS.count("._fromUrl()") >= 2
+
+
+def test_header_renders_before_any_data():
+    """HA sets `narrow` before garage/get answers, so the header (and its tabs) renders with
+    no data. v0.7.0-0.7.1 read d.vehicles off null there and the panel never opened."""
+    body = JS.split("_tabs(d) {")[1].split("\n  }\n")[0]
+    assert "(d && d.vehicles)" in body and "d && d.vehicle && d.vehicle.entry_id" in body
+
+
+def test_harness_sets_hass_before_narrow_like_home_assistant():
+    shoot = (ROOT.parents[1] / "dev" / "shoot.py").read_text()
+    assert "el.hass = hass; el.narrow = __NARROW__;" in shoot
