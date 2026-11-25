@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.7.1';
+var VERSION = '0.7.3';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
@@ -542,9 +542,11 @@ class GaragePanel extends HTMLElement {
   /* One tab per vehicle, only when there is more than one. The badge is that vehicle's worst news:
      a count overdue, a count due soon, or a hatched dot for "never logged". */
   _tabs(d) {
-    var vs = d.vehicles || [];
+    /* Called while building the header, which also renders BEFORE the first garage/get
+       answers (HA sets narrow early): no data yet is no tabs, never a throw. */
+    var vs = (d && d.vehicles) || [];
     if (vs.length < 2) return '';
-    var cur = d.vehicle && d.vehicle.entry_id;
+    var cur = d && d.vehicle && d.vehicle.entry_id;
     return '<div class="vtabs" role="tablist" aria-label="Vehicle">' + vs.map(function (x) {
       var s = x.summary || {};
       var b = s.over ? '<span class="vb">' + s.over + '</span>' : s.soon ? '<span class="vb soon">' + s.soon + '</span>' : s.nolog ? '<span class="vb nolog" aria-hidden="true"></span>' : '';

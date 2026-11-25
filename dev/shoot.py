@@ -77,7 +77,7 @@ var hass = { states: states, themes: {darkMode: __DARK__},
   fetchWithAuth: function(u){ return fetch('/truck.png'); } };
 var tag = [...document.querySelectorAll('script')].length && Object.keys(window).length;
 customElements.whenDefined('__TAG__').then(function(){
-  var el = document.createElement('__TAG__'); el.narrow = __NARROW__; el.hass = hass; document.body.appendChild(el); window.el = el; });
+  var el = document.createElement('__TAG__'); el.hass = hass; el.narrow = __NARROW__; document.body.appendChild(el); window.el = el; });
 </script></body></html>"""
 
 
