@@ -11,7 +11,7 @@
  */
 (function () {
 'use strict';
-var VERSION = '0.7.3';
+var VERSION = '0.8.0';
 var TAG = 'garage-panel-' + VERSION.replace(/\./g, '-');
 if (customElements.get(TAG)) return;
 
@@ -32,7 +32,7 @@ var CSS = [
 '.cols{display:flex;flex-direction:column;gap:16px}',
 '.col{display:contents}',
 '.hero{order:1}.roadcard{order:2}.list{order:3}#tiles{order:4}.logcard{order:5}',
-'@media (min-width:1060px){.app{max-width:1160px}.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}.col{display:flex;flex-direction:column;gap:16px;min-width:0}#tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}',
+'@media (min-width:1060px){.vtabs{flex:0 1 auto}.vtab{flex:0 0 auto;min-width:150px;padding:0 22px}.app{max-width:1160px}.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}.col{display:flex;flex-direction:column;gap:16px;min-width:0}#tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}',
 '.top{display:flex;align-items:center;gap:6px;height:58px}',
 '.iconbtn{width:44px;height:44px;border-radius:22px;display:grid;place-items:center;color:var(--ink2)}',
 '.title{padding:2px 4px 18px}',
@@ -41,7 +41,7 @@ var CSS = [
 '.vtab[aria-selected=true]{background:var(--ink);border-color:var(--ink);color:var(--ground)}',
 '.vb{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--over);color:#fff;font-size:11.5px;font-weight:700;display:grid;place-items:center}',
 '.vb.soon{background:var(--soon);color:#2B1600}',
-'.vb.nolog{min-width:9px;width:9px;height:9px;padding:0;background:repeating-linear-gradient(45deg,var(--ink3) 0 2px,transparent 2px 4px);box-shadow:0 0 0 1px var(--ink3)}',
+'.vb.nolog{background:transparent;color:inherit;opacity:.8;border:1.5px dashed currentColor;height:18px}',
 '.odobtn{position:relative;height:30px;padding:0 12px;margin-left:4px;border-radius:15px;background:var(--cav);color:#fff;font-size:12.5px;font-weight:650}',
 ':host([dark]) .odobtn{color:#0A0E18}',
 '.odobtn::after{content:"";position:absolute;inset:-7px -4px}',
@@ -117,6 +117,14 @@ var CSS = [
 '.lane i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ink)}',
 '.tick{position:absolute;bottom:22px;transform:translateX(-50%);font-size:11px;font-weight:600;color:var(--ink3)}',
 '.now{position:absolute;bottom:41px;width:34px;margin-left:-17px;color:var(--cav)}',
+'.visit{display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px;align-items:start;padding-top:10px;border-top:1px solid var(--track)}',
+'.visit .when b{display:block;font-size:14px;font-weight:650;line-height:1.25}.visit .when span{display:block;font-size:11.5px;font-weight:600;color:var(--ink3)}',
+'.unk{margin:0;font-size:12.5px;line-height:1.45;color:var(--ink2)}',
+'.vsep{display:block;width:14px;height:2px;border-radius:1px;background:var(--ink3);opacity:.7;margin:-3px 0}',
+'.lane.blind{background:repeating-linear-gradient(45deg,var(--hatch) 0 3px,transparent 3px 7px);height:10px;bottom:48px}',
+'.fold{display:flex;align-items:center;gap:8px}.fold .goodrow{flex:1;min-width:0}.fold .goodrow svg{margin-left:auto}',
+'.cu{flex:none;height:44px;padding:0 14px;border-radius:22px;background:var(--card2);font-size:13px;font-weight:650;color:var(--ink2)}',
+'.emptylog{display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center;padding:18px;border-radius:16px;border:1.5px dashed var(--track)}.emptylog b{font-size:14px;font-weight:650}.emptylog span{font-size:12.5px;color:var(--ink3)}',
 '.nologrow{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:14px;padding-top:14px;border-top:1px solid var(--track)}',
 '.q{width:24px;height:24px;display:grid;place-items:center;color:var(--ink3)}',
 /* list */
@@ -549,7 +557,7 @@ class GaragePanel extends HTMLElement {
     var cur = d && d.vehicle && d.vehicle.entry_id;
     return '<div class="vtabs" role="tablist" aria-label="Vehicle">' + vs.map(function (x) {
       var s = x.summary || {};
-      var b = s.over ? '<span class="vb">' + s.over + '</span>' : s.soon ? '<span class="vb soon">' + s.soon + '</span>' : s.nolog ? '<span class="vb nolog" aria-hidden="true"></span>' : '';
+      var b = s.over ? '<span class="vb">' + s.over + '</span>' : s.soon ? '<span class="vb soon">' + s.soon + '</span>' : s.nolog ? '<span class="vb nolog" title="Never logged">' + s.nolog + '</span>' : '';
       return '<button class="vtab" role="tab" data-act="veh" data-id="' + esc(x.entry_id) + '" aria-selected="' + (x.entry_id === cur) + '">' + esc(x.name) + b + '</button>';
     }).join('') + '</div>';
   }
@@ -573,6 +581,9 @@ class GaragePanel extends HTMLElement {
       if (!its.length) return;
       var worst = its.reduce(function (a, b) { return RANK[b.status] < RANK[a] ? b.status : a; }, 'ok');
       var due = its.filter(function (i) { return i.status !== 'ok'; }).length;
+      /* A dot for every zone made the good and the never-logged ones unreadable noise: only
+         what needs doing (or the zone you picked) is marked on the picture. */
+      if (worst !== 'over' && worst !== 'soon' && sel !== z) return;
       spots += '<button class="hs ' + worst + (sel === z ? ' sel' : '') + '" style="left:' + pos[0] + '%;top:' + pos[1] + '%" data-act="zone" data-z="' + esc(z) +
         '" aria-pressed="' + (sel === z) + '" aria-label="' + esc(zones[z]) + ', ' + due + ' need attention"><i></i></button>';
       /* Only what needs doing is named on the photo (plus the one you picked); a name on every dot is a parts diagram. */
@@ -584,7 +595,7 @@ class GaragePanel extends HTMLElement {
     var pair = function (n, l, c, minor) { return '<span class="bn' + (minor ? ' minor' : '') + '"><span class="n ' + c + '">' + esc(n) + '</span><span class="l">' + esc(l) + '</span></span>'; };
     var byRank = function (a, b) { return RANK[a.status] - RANK[b.status] || (a.remaining == null ? 0 : a.remaining) - (b.remaining == null ? 0 : b.remaining); };
     var big, chips;
-    var fresh0 = !s.over && !s.soon && s.nolog > 0 && !((this._data && this._data.log) || []).length;
+    var fresh0 = this._fresh0();
     if (sel && zones[sel]) {
       var its = items.filter(function (i) { return i.zone === sel; }).sort(byRank);
       var due = its.filter(function (i) { return i.status !== 'ok'; });
@@ -592,7 +603,8 @@ class GaragePanel extends HTMLElement {
       chips = its;
     } else if (s.over || s.soon) {
       big = (s.over ? pair(s.over, 'overdue', 'c-over') : '') + (s.soon ? pair(s.soon, 'soon', 'c-soon', !!s.over) : '');
-      chips = items.filter(function (i) { return i.status === 'over' || i.status === 'soon'; }).sort(byRank);
+      /* No chips: the map's next visits and the list already name these, a third time is noise. */
+      chips = [];
     } else if (fresh0) {
       /* Nothing has a record yet (a new vehicle): not "all good", and not "6,750 mi to Plugs"
          either, which only means plugs are the first item whose due point is known. */
@@ -641,84 +653,129 @@ class GaragePanel extends HTMLElement {
     });
   }
 
+  /* A vehicle with nothing logged at all: every "next" it could name is only the next one it can see. */
+  _fresh0() {
+    var s = this._data.vehicle.summary || {};
+    return !s.over && !s.soon && s.nolog > 0 && !((this._data && this._data.log) || []).length;
+  }
+
   _road(v) {
     var odo = v.odometer;
-    var pace = v.pace;
-    var chip = pace ? '<span class="chip">≈ ' + fmt(pace) + ' mi/day</span>' : '';
-    var head = '<div class="hd"><span class="ico">' + I.map + '</span><span class="t">Map</span>' + chip +
-      '<button class="chip" style="margin-left:' + (chip ? '6px' : 'auto') + '" data-act="poster">Full map</button></div>';
+    var head = '<div class="hd"><span class="ico">' + I.map + '</span><span class="t">Map</span>' +
+      '<button class="chip" style="margin-left:auto" data-act="poster">Full map</button></div>';
     if (odo == null) return '<section class="card roadcard">' + head + '<div class="hatchbox" style="margin-top:14px;height:80px"></div></section>';
+    var blind = this._fresh0();
     var start = Math.floor((odo - 15000) / 10000) * 10000;
     if (start < 0) start = 0;
     var end = start + 55000;
     var pct = function (m) { return Math.max(0, Math.min(100, (m - start) / (end - start) * 100)); };
     var byRank = function (a, b) { return RANK[a.status] - RANK[b.status] || a.due_at - b.due_at || a.n - b.n; };
-    var items = this._items().filter(function (i) { return i.status !== 'nolog' && i.due_at != null; });
-    /* Stops closer than 9% of the strip are one stop: two stacks that touch are two targets nobody can hit. */
+    var items = this._items().filter(function (i) { return i.status !== 'nolog' && i.due_at != null; })
+      .sort(function (a, b) { return a.due_at - b.due_at || a.n - b.n; });
+    /* A VISIT is what you would do on one trip: everything overdue is one visit, and the rest group
+       while due within 1,000 mi AND 30 days of the visit's first item. Grouping by how close the
+       stacks sit on screen (9% of the strip, ~5k mi) once sold ten months of driving as one stop. */
+    var visits = [];
+    var over = items.filter(function (i) { return i.status === 'over'; });
+    if (over.length) visits.push({ over: true, at: over[0].due_at, items: over });
+    items.forEach(function (i) {
+      if (i.status === 'over') return;
+      var last = visits[visits.length - 1];
+      var days = last && i.eta && last.eta ? (pd(i.eta) - pd(last.eta)) / 86400000 : 0;
+      if (last && !last.over && i.due_at - last.at <= 1000 && days <= 30) last.items.push(i);
+      else visits.push({ at: i.due_at, eta: i.eta, items: [i] });
+    });
+    visits.forEach(function (x) { x.items.sort(byRank); });
+    var upcoming = visits.findIndex(function (x) { return !x.over; });
+    /* Drawing is separate from meaning: visits whose stacks would touch share one stack, with a rule
+       between them, because two stacks 10px apart are two targets nobody can hit. */
     var buckets = [];
-    items.sort(function (a, b) { return a.due_at - b.due_at; }).forEach(function (i) {
-      var p = i.due_at > end ? 100 : pct(i.due_at);
-      var b = buckets.find(function (x) { return Math.abs(x.p0 - p) < 9; });
-      if (b) b.items.push(i); else buckets.push({ p0: p, p: p, items: [i] });
+    visits.forEach(function (x, vi) {
+      var p = x.at > end ? 100 : pct(x.at);
+      var b = buckets.find(function (y) { return Math.abs(y.p0 - p) < 9; });
+      if (b) b.visits.push(vi); else buckets.push({ p0: p, p: p, visits: [vi] });
     });
     var odoP = pct(odo);
     buckets.forEach(function (b) { if (Math.abs(b.p - odoP) < 4) b.p = Math.min(100, odoP + 6); });
     /* Nudging a stop clear of the truck can push it into its neighbour: merge again where they now meet. */
     buckets.sort(function (a, b) { return a.p - b.p; });
     for (var bi0 = 1; bi0 < buckets.length; bi0++) {
-      if (buckets[bi0].p - buckets[bi0 - 1].p < 9) { buckets[bi0 - 1].items = buckets[bi0 - 1].items.concat(buckets[bi0].items); buckets.splice(bi0, 1); bi0--; }
+      if (buckets[bi0].p - buckets[bi0 - 1].p < 9) { buckets[bi0 - 1].visits = buckets[bi0 - 1].visits.concat(buckets[bi0].visits); buckets.splice(bi0, 1); bi0--; }
     }
-    buckets.forEach(function (b) { b.items.sort(byRank); });
-    var upcoming = buckets.findIndex(function (b) { return b.items.some(function (i) { return i.status !== 'over'; }); });
-    var selB = this._stop != null && this._stop < buckets.length ? this._stop : (upcoming >= 0 ? upcoming : 0);
-    var tall = 1;
+    buckets.forEach(function (b) { b.visits.sort(function (a, c) { return a - c; }); });
+    var upB = buckets.findIndex(function (b) { return b.visits.indexOf(upcoming) >= 0; });
+    var selB = this._stop != null && this._stop < buckets.length ? this._stop : (upB >= 0 ? upB : 0);
+    var tall = 1, seps = 0;
     var stacks = buckets.map(function (b, bi) {
-      var shown = b.items.length > 5 ? b.items.slice(0, 4) : b.items;
-      tall = Math.max(tall, shown.length + (b.items.length > shown.length ? 1 : 0));
+      var flat = [];
+      b.visits.forEach(function (vi, k) { if (k) flat.push(null); visits[vi].items.forEach(function (i) { flat.push(i); }); });
+      var total = flat.filter(Boolean).length, cap = total > 5 ? 4 : total, shown = [], n = 0;
+      flat.forEach(function (i) { if (n >= cap) return; if (i) n++; else if (!n || n >= cap) return; shown.push(i); });
+      while (shown.length && !shown[shown.length - 1]) shown.pop();
+      var sp = shown.filter(function (i) { return !i; }).length;
+      if (cap + (total > cap ? 1 : 0) + sp * 0.4 > tall + seps * 0.4) { tall = cap + (total > cap ? 1 : 0); seps = sp; }
       return '<div class="stk' + (bi === selB ? ' on' : '') + '" style="left:' + b.p.toFixed(1) + '%">' + shown.map(function (i) {
-        return '<button data-act="stop" data-b="' + bi + '" aria-label="' + esc(i.name) + '"><span class="nb ' + i.status + '">' + i.n + '</span></button>';
-      }).join('') + (b.items.length > shown.length ? '<button data-act="stop" data-b="' + bi + '" class="plusn" aria-label="' + (b.items.length - shown.length) + ' more">+' + (b.items.length - shown.length) + '</button>' : '') + '</div>';
+        return i ? '<button data-act="stop" data-b="' + bi + '" aria-label="' + esc(i.name) + '"><span class="nb ' + i.status + '">' + i.n + '</span></button>' : '<span class="vsep" aria-hidden="true"></span>';
+      }).join('') + (total > cap ? '<button data-act="stop" data-b="' + bi + '" class="plusn" aria-label="' + (total - cap) + ' more">+' + (total - cap) + '</button>' : '') + '</div>';
     }).join('');
     var ticks = '';
     for (var m = start; m <= end; m += 10000) ticks += '<span class="tick" style="left:' + pct(m).toFixed(1) + '%">' + (m / 1000) + 'k</span>';
+    var kk = function (x) { return (x / 1000).toFixed(x % 1000 ? 1 : 0) + 'k'; };
+    var chips = function (its) {
+      return '<div class="schips">' + its.map(function (i) {
+        return '<button class="ichip" data-act="item" data-n="' + i.n + '"><span class="nb ' + i.status + '">' + i.n + '</span>' + esc(i.short) + '</button>';
+      }).join('') + '</div>';
+    };
+    var row = function (x) {
+      var when = x.over ? '<b>Overdue</b><span>since ' + kk(x.at) + '</span>'
+        : x.eta ? '<b>' + esc(dmonth(x.eta)) + '</b><span>' + kk(x.at) + '</span>' : '<b>' + kk(x.at) + '</b>';
+      return '<div class="visit"><div class="when">' + when + '</div>' + chips(x.items) + '</div>';
+    };
     var stop = '';
-    var sb = buckets[selB];
-    if (sb) {
-      var kk = function (x) { return (x / 1000).toFixed(x % 1000 ? 1 : 0) + 'k'; };
-      var lo = sb.items.reduce(function (a, i) { return Math.min(a, i.due_at); }, Infinity);
-      var hi = sb.items.reduce(function (a, i) { return Math.max(a, i.due_at); }, -Infinity);
-      var allOver = sb.items.every(function (i) { return i.status === 'over'; });
-      var etas = sb.items.map(function (i) { return i.eta; }).filter(Boolean).sort();
-      var when = etas.length ? dmonth(etas[0]) + (dmonth(etas[etas.length - 1]) !== dmonth(etas[0]) ? ' → ' + dmonth(etas[etas.length - 1]) : '') : '';
-      var title = allOver ? 'Overdue' : (selB === upcoming ? 'Next stop' : 'Later');
-      stop = '<div class="stop"><div class="sh"><b>' + title + '</b><span>' + (allOver ? 'was due at ' : '') + (lo === hi ? kk(lo) : kk(lo) + ' – ' + kk(hi)) + (when && !allOver ? ' · ' + esc(when) : '') + '</span></div>' +
-        '<div class="schips">' + sb.items.map(function (i) {
-          return '<button class="ichip" data-act="item" data-n="' + i.n + '"><span class="nb ' + i.status + '">' + i.n + '</span>' + esc(i.short) + '</button>';
-        }).join('') + '</div></div>';
+    if (blind) {
+      /* Nothing logged: the first item with a known due point is not the next stop, it is only the
+         next one we can see. Say so, and leave the road ahead hatched (unknown), not clean. */
+      var nk = visits[upcoming];
+      stop = '<div class="stop"><div class="sh"><b>Next known</b>' + (nk ? '<span>' + kk(nk.at) + '</span>' : '') + '</div>' +
+        (nk ? chips(nk.items) : '') + '<p class="unk">Everything else is unknown until you catch up.</p></div>';
+    } else if (buckets.length) {
+      var picked = this._stop != null && this._stop < buckets.length;
+      var vs = picked ? buckets[selB].visits : visits.map(function (x, i) { return i; }).filter(function (i) { return !visits[i].over; }).slice(0, 3);
+      if (!vs.length) vs = buckets[selB].visits;
+      var allOver = vs.every(function (i) { return visits[i].over; });
+      var title = allOver ? 'Overdue' : (vs.indexOf(upcoming) >= 0 ? 'Next visits' : 'Later');
+      stop = '<div class="stop"><div class="sh"><b>' + title + '</b></div>' + vs.map(function (i) { return row(visits[i]); }).join('') + '</div>';
     }
-    var nolog = this._items().filter(function (i) { return i.status === 'nolog'; });
-    var nl = nolog.length ? '<div class="nologrow"><span class="nlt">Never logged</span>' + nolog.map(function (i) {
-      return '<button data-act="item" data-n="' + i.n + '" aria-label="' + esc(i.name) + '"><span class="nb nolog">' + i.n + '</span></button>';
-    }).join('') + '<button class="chip" data-act="catchup">Catch up</button></div>' : '';
-    return '<section class="card roadcard">' + head + '<div class="road" style="height:' + (62 + tall * 32 + 8) + 'px">' + stacks + '<div class="lane"><i style="width:' + odoP.toFixed(1) + '%"></i></div>' +
-      '<span class="now" style="left:' + odoP.toFixed(1) + '%" role="img" aria-label="Now">' + I.truck + '</span>' + ticks + '</div>' + stop + nl + '</section>';
+    return '<section class="card roadcard">' + head + '<div class="road" style="height:' + Math.round(62 + tall * 32 + seps * 9 + 8) + 'px">' + stacks +
+      '<div class="lane' + (blind ? ' blind' : '') + '"><i style="width:' + odoP.toFixed(1) + '%"></i></div>' +
+      '<span class="now" style="left:' + odoP.toFixed(1) + '%" role="img" aria-label="Now">' + I.truck + '</span>' + ticks + '</div>' + stop + '</section>';
   }
 
   _list(v) {
     var items = this._items();
     var self = this;
+    var fresh0 = this._fresh0();
     var html = '<section class="card list" style="padding-top:8px;padding-bottom:12px" aria-label="Service items">';
     GROUPS.forEach(function (g) {
       var its = items.filter(function (i) { return i.status === g[0]; });
       if (!its.length) return;
       its.sort(function (a, b) { return (a.remaining == null ? 0 : a.remaining) - (b.remaining == null ? 0 : b.remaining) || a.n - b.n; });
-      html += '<div class="grp">' + g[1] + (g[0] === 'nolog' ? '<button data-act="catchup">Catch up</button>' : '') + '</div>';
+      /* The two groups nobody reads row by row fold into one line each, and the line is its own heading. */
+      if (g[0] === 'over' || g[0] === 'soon') html += '<div class="grp">' + g[1] + '</div>';
+      if (g[0] === 'nolog') {
+        var names = its.slice(0, 3).map(function (i) { return i.short; }).join(', ') + (its.length > 3 ? ' +' + (its.length - 3) : '');
+        /* Catch up lives here only when the hero isn't already offering it. */
+        html += '<div class="fold"><button class="goodrow" data-act="nolog" aria-expanded="' + !!self._showNolog + '"><span class="gt"><b>Never logged</b><span>' + esc(names) +
+          '</span></span>' + I.down + '</button>' +
+          (fresh0 ? '' : '<button class="cu" data-act="catchup">Catch up</button>') + '</div>';
+        if (!self._showNolog) return;
+      }
       if (g[0] === 'ok') {
         /* On schedule is the one group nobody needs to read row by row: one line, open on request. */
         var min = its[0].remaining;
         var nx = its.filter(function (i) { return i.remaining === min; }).slice(0, 2).map(function (i) { return i.short; }).join(' & ');
         html += '<button class="goodrow" data-act="good" aria-expanded="' + !!self._showGood + '"><span class="gt"><b>' + its.length + ' on schedule</b><span>next ' + esc(nx) +
-          (min != null ? ' · ' + fmt(min) + ' mi' + (its[0].eta ? ' ≈ ' + esc(dmonth(its[0].eta)) : '') : '') + '</span></span><span class="stackn">' +
+          (its[0].eta ? ' · ' + esc(dmonth(its[0].eta)) : min != null ? ' · ' + fmt(min) + ' mi' : '') + '</span></span><span class="stackn">' +
           its.slice(0, 3).map(function (i) { return '<span class="nb ok">' + i.n + '</span>'; }).join('') + (its.length > 3 ? '<span class="nb plus">+' + (its.length - 3) + '</span>' : '') +
           '</span>' + I.down + '</button>';
         if (!self._showGood) return;
@@ -887,7 +944,7 @@ class GaragePanel extends HTMLElement {
     var html = '<section class="card logcard" style="padding-bottom:12px"><div class="hd"><span class="ico">' + I.log + '</span><span class="t">Log</span>' +
       (rows.length ? '<button class="hdbtn" data-act="export"' + (this._exporting ? ' disabled' : '') + ' title="A printable service record and a CSV, e.g. for a sale">Service record</button>' : '') +
       '</div><div style="margin-top:6px">';
-    if (!rows.length) html += '<div class="hatchbox" style="height:48px"></div>';
+    if (!rows.length) html += '<div class="emptylog"><b>Nothing logged yet</b><span>Services you log, or add with Catch up, appear here.</span></div>';
     shown.forEach(function (e) {
       var meta = [e.odometer == null ? '—' : fmt(e.odometer), BY[e.by] || ''].filter(Boolean).join(' · ');
       html += '<button class="entry" data-act="edit" data-id="' + esc(e.id) + '"><span class="d"><b>' + esc(dyear(e.date)) + (e.edited ? '<span class="edited">edited</span>' : '') + '</b><span>' + esc(meta) + '</span></span><span class="its">' +
@@ -1177,7 +1234,7 @@ class GaragePanel extends HTMLElement {
       if (this._data && this._data.vehicle && this._data.vehicle.entry_id === id) return;
       this._entry = id;
       try { localStorage.setItem('garage.vehicle', id); } catch (e2) { /* per-device nicety only */ }
-      this._zone = null; this._showAll = false; this._showGood = false; this._stop = null;
+      this._zone = null; this._showAll = false; this._showGood = false; this._showNolog = false; this._stop = null;
       if (this._sheet) this._close();
       this._load();
       return;
@@ -1204,6 +1261,7 @@ class GaragePanel extends HTMLElement {
     }
     if (a === 'stop') { this._stop = +el.dataset.b; this._render(); return; }
     if (a === 'good') { this._showGood = !this._showGood; this._render(); return; }
+    if (a === 'nolog') { this._showNolog = !this._showNolog; this._render(); return; }
     if (a === 'cu') {
       this._cuSync();
       var cs = this._sheet, ca = cs.ans[n] = cs.ans[n] || {};

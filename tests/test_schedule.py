@@ -202,3 +202,13 @@ def test_tacoma_still_has_no_month_limits():
 def test_kona_with_no_mileage_is_all_nolog_not_zero():
     st = sched.compute(KONA, [], None, TODAY)
     assert {s.status for s in st} == {"nolog"} and all(s.remaining is None for s in st)
+
+
+def test_a_vehicle_with_nothing_logged_has_no_next_service():
+    from types import SimpleNamespace as NS
+    known = NS(n=10, short="Coolant", name="Coolant", status="ok", remaining=59150, eta=None)
+    blank = NS(n=1, short="Oil", name="Oil", status="nolog", remaining=None, eta=None)
+    s = sched.summary([known, blank], 0)
+    assert s["next"] is None and s["next_known"]["short"] == "Coolant"
+    assert sched.summary([known, blank], 3)["next"]["short"] == "Coolant"
+    assert sched.summary([known, blank])["next"]["short"] == "Coolant"   # unknown count: unchanged
